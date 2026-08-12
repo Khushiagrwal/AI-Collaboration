@@ -6,7 +6,8 @@ import { HttpClient } from '@angular/common/http';
 })
 export class Auth {
     private http=inject(HttpClient);
-    private api= "http://localhost:8080/api/auth";
+    // private api= "http://localhost:8080/api/auth";
+    private api="https://ai-collaboration.onrender.com/api/auth"
 
   register(data:any){
     return this.http.post(`${this.api}/register`, data);
