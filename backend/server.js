@@ -4,8 +4,8 @@ const dotenv = require("dotenv");
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const express = require("express");
-const connectDB = require("./config/db");
-const authRoute = require("./routes/auth.route");
+const connectDB = require("./src/config/db");
+const authRoute = require("./src/routes/auth.route");
 const app = express();
 const cors= require('cors');
 
