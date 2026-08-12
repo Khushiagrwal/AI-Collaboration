@@ -1,0 +1,142 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Poppins,sans-serif;
+}
+
+.container{
+    min-height:100vh;
+    display:flex;
+}
+
+/* LEFT */
+
+.left-panel{
+    flex:1;
+    background:linear-gradient(135deg,#6a11cb,#2575fc,#00c6ff);
+    color:white;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    padding:60px;
+    text-align:center;
+}
+
+.left-panel h1{
+    font-size:48px;
+    margin-bottom:20px;
+}
+
+.left-panel p{
+    max-width:420px;
+    font-size:18px;
+    line-height:1.7;
+}
+
+/* RIGHT */
+
+.right-panel{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#f8f9ff;
+    padding:30px;
+}
+
+.login-card{
+    width:100%;
+    max-width:430px;
+    background:white;
+    padding:40px;
+    border-radius:20px;
+    box-shadow:0 20px 40px rgba(0,0,0,.1);
+}
+
+.login-card h2{
+    font-size:34px;
+    color:#333;
+}
+
+.login-card p{
+    color:#777;
+    margin:10px 0 30px;
+}
+
+.form-group{
+    margin-bottom:18px;
+}
+
+label{
+    display:block;
+    margin-bottom:8px;
+    font-weight:600;
+}
+
+input{
+    width:100%;
+    padding:14px;
+    border:2px solid #ddd;
+    border-radius:10px;
+    font-size:15px;
+    transition:.3s;
+}
+
+input:focus{
+    outline:none;
+    border-color:#2575fc;
+    box-shadow:0 0 10px rgba(37,117,252,.25);
+}
+
+small{
+    color:#e53935;
+    margin-top:5px;
+    display:block;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    background:linear-gradient(90deg,#ff6a00,#ee0979);
+    color:white;
+    font-size:17px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.3s;
+}
+
+button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 20px rgba(238,9,121,.35);
+}
+
+/* MOBILE */
+
+@media(max-width:768px){
+
+.container{
+    flex-direction:column;
+}
+
+.left-panel{
+    min-height:35vh;
+    padding:30px;
+}
+
+.left-panel h1{
+    font-size:34px;
+}
+
+.right-panel{
+    padding:20px;
+}
+
+.login-card{
+    padding:25px;
+}
+
+}
