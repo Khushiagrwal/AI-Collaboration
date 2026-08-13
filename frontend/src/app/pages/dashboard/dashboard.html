@@ -99,7 +99,7 @@
 
         <h2>Quick Actions</h2>
 
-        <button (click)="createBoard()">Create Board</button>
+        <button (click)="showCreateModal=true">Create Board</button>
 
         <button (click)="inviteTeam()">Invite Team</button>
 
@@ -114,3 +114,5 @@
   </main>
 
 </div>
+
+<app-create-board-modal *ngif="showCreateModal"></app-create-board-modal>

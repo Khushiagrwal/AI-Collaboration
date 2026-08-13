@@ -1,5 +1,5 @@
 const express= require('express');
-const router= express.router();
+const router= express.Router();
 const authMiddleware = require("../middleware/auth");
 const {getBoard,getBoards,createBoard,updateBoard,deleteBoard}=require("../controllers/board.controllers");
 

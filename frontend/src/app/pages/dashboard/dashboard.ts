@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../services/authService/auth';
+import { CreateBoardModal } from '../../components/create-board-modal/create-board-modal';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink,CreateBoardModal,CommonModule],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
 })
@@ -47,6 +49,8 @@ export class Dashboard {
       action: 'Generated Meeting Summary'
     }
   ];
+
+  showCreateModal=false;
 
   logout() {
     this.auth.logout();
