@@ -16,6 +16,7 @@ export class Board {
     } 
 
     createBoard(data:any){
+        console.log("oue")
         return this.http.post(`${this.api}/board/`,data)
     }
 

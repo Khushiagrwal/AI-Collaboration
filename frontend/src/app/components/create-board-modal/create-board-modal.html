@@ -1,21 +1,29 @@
 <div class="overlay">
 
-    <div class="modal">
+  <div class="modal">
 
-        <h2>Create New Board</h2>
+    <h2>Create Board</h2>
 
-        <input
-            type="text"
-            placeholder="Enter board name">
+    <p>Give your whiteboard a meaningful name.</p>
 
-        <div class="buttons">
+    <input
+      type="text"
+      placeholder="Board Title"
+      [(ngModel)]="title"
+    >
 
-            <button>Create</button>
+    <div class="buttons">
 
-            <button>Cancel</button>
-   
-        </div>
+      <button class="cancel">
+        Cancel
+      </button>
+
+      <button class="create" (click)="createBoard()">
+        Create Board
+      </button>
 
     </div>
+
+  </div>
 
 </div>

@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../services/authService/auth';
 import { CreateBoardModal } from '../../components/create-board-modal/create-board-modal';
 import { CommonModule } from '@angular/common';
+import { Board } from '../../services/boardService/board';
 
 @Component({
   selector: 'app-dashboard',
@@ -15,9 +16,28 @@ export class Dashboard {
 
   constructor(
     private auth: Auth,
+    private boardService:Board,
     private router: Router
   ) {}
 
+  ngOnInit(){
+    this.loadBoards();
+  }
+
+  activeTab: string = 'dashboard';
+  boards:any[]=[]
+  
+  loadBoards(){
+    this.boardService.getBoards().subscribe({
+      next:(res:any)=>{
+        this.boards=res.boards;
+        console.log("Successfully loads",res.boards)
+      },error:(err:any)=>{
+        alert(err?.message)
+      }
+    })
+  }
+  
   // Dashboard Statistics
   stats = {
     boards: 18,

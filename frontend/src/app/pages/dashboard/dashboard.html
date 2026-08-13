@@ -6,13 +6,44 @@
     <h2 class="logo">🚀 WhiteBoard AI</h2>
 
     <nav>
-      <a class="active">🏠 Dashboard</a>
-      <a>📋 Boards</a>
-      <a>👥 Team</a>
-      <a>💬 Chat</a>
-      <a>📊 Analytics</a>
-      <a>⚙️ Settings</a>
-    </nav>
+
+  <a
+    [class.active]="activeTab==='dashboard'"
+    (click)="activeTab='dashboard'">
+    🏠 Dashboard
+  </a>
+
+  <a
+    [class.active]="activeTab==='boards'"
+    (click)="activeTab='boards'">
+    📋 Boards
+  </a>
+
+  <a
+    [class.active]="activeTab==='team'"
+    (click)="activeTab='team'">
+    👥 Team
+  </a>
+
+  <a
+    [class.active]="activeTab==='chat'"
+    (click)="activeTab='chat'">
+    💬 Chat
+  </a>
+
+  <a
+    [class.active]="activeTab==='analytics'"
+    (click)="activeTab='analytics'">
+    📊 Analytics
+  </a>
+
+  <a
+    [class.active]="activeTab==='settings'"
+    (click)="activeTab='settings'">
+    ⚙️ Settings
+  </a>
+
+</nav>
 
     <button class="logout" (click)="logout()">
       Logout
@@ -116,3 +147,63 @@
 </div>
 
 <app-create-board-modal *ngIf="showCreateModal"></app-create-board-modal>
+<!-- Boards Section -->
+
+<div class="boards-section">
+
+  <div class="boards-header">
+
+    <h2>📋 Your Boards</h2>
+
+    <button class="new-board-btn"
+            (click)="showCreateModal = true">
+      + New Board
+    </button>
+
+  </div>
+
+  <div class="boards-grid">
+
+    <div class="board-card"
+         *ngFor="let board of boards">
+
+      <div class="board-icon">
+        📄
+      </div>
+
+      <h3>{{ board.title }}</h3>
+
+      <p>
+        Last Updated:
+        {{ board.updatedAt | date:'mediumDate' }}
+      </p>
+
+      <div class="board-footer">
+
+        <span>
+          👥 {{ board.participants.length }} Members
+        </span>
+
+        <div class="board-actions">
+
+          <button class="open-btn">
+            Open
+          </button>
+
+          <button class="edit-btn">
+            Edit
+          </button>
+
+          <button class="delete-btn">
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>

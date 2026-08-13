@@ -26,4 +26,4 @@ app.listen(PORT, () => {
 });
 
 app.use("/api/auth/",authRoute);
-app.use("/api/board",boardRoute);
+app.use("/api/board/",boardRoute);

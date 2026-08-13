@@ -28,10 +28,11 @@ exports.getBoard = async(req,res)=>{
 
 exports.createBoard = async(req,res)=>{
     try{
+        
         const title=req.body.title;
         if (!title || title.trim() === "")
             return res.status(404).json({message:"Required Board Title"});
-        const board=await Board.create({title:title,owner:req.user._id});
+        const board=await Board.create({title:title,owner:req.user.id});
         return res.status(200).json({success:true,message:"Board Create Successfully",board})
     }catch(err)
     {
