@@ -1,20 +1,19 @@
 import { inject, Injectable, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 @Injectable({
     providedIn:'root'
 })
 export class Auth {
     private http=inject(HttpClient);
-    // private api= "http://localhost:8080/api/auth";
-    private api="https://ai-collaboration.onrender.com/api/auth"
-
+    private api= environment.BACKEND_URL
   register(data:any){
-    return this.http.post(`${this.api}/register`, data);
+    return this.http.post(`${this.api}/auth/register`, data);
   }
 
   login(data:any){
-    return this.http.post(`${this.api}/login`, data);
+    return this.http.post(`${this.api}/auth/login`, data);
   }
   
   logout(){

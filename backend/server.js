@@ -6,6 +6,7 @@ const dotenv = require("dotenv");
 const express = require("express");
 const connectDB = require("./src/config/db");
 const authRoute = require("./src/routes/auth.route");
+const boardRoute = require("./src/routes/board.route")
 const app = express();
 const cors= require('cors');
 
@@ -25,3 +26,4 @@ app.listen(PORT, () => {
 });
 
 app.use("/api/auth/",authRoute);
+app.use("/api/board",boardRoute);

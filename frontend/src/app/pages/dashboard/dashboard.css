@@ -2,69 +2,58 @@
     margin:0;
     padding:0;
     box-sizing:border-box;
-    font-family:'Poppins',sans-serif;
+    font-family:Arial, Helvetica, sans-serif;
 }
-
-body{
-    background:#eef3ff;
-}
-
-/* Dashboard */
 
 .dashboard{
     display:flex;
     min-height:100vh;
-    background:linear-gradient(135deg,#eef2ff,#dbeafe);
+    background:#f5f7fb;
 }
 
 /* Sidebar */
 
 .sidebar{
-    width:260px;
-    background:#0f172a;
+    width:250px;
+    background:#1f2937;
     color:white;
+    padding:30px 20px;
     display:flex;
     flex-direction:column;
-    justify-content:space-between;
-    padding:30px 20px;
 }
 
 .logo{
-    font-size:28px;
-    font-weight:700;
     margin-bottom:40px;
+    font-size:24px;
 }
 
 .sidebar nav{
     display:flex;
     flex-direction:column;
-    gap:15px;
+    gap:18px;
 }
 
-.sidebar a{
-    text-decoration:none;
-    color:#cbd5e1;
-    padding:15px;
-    border-radius:12px;
-    transition:.3s;
+.sidebar nav a{
+    padding:12px;
+    border-radius:10px;
     cursor:pointer;
+    transition:.3s;
 }
 
-.sidebar a:hover,
-.sidebar .active{
-    background:#6366f1;
-    color:white;
-    transform:translateX(8px);
+.sidebar nav a:hover,
+.sidebar nav .active{
+    background:#374151;
 }
 
 .logout{
-    background:#ef4444;
+    margin-top:auto;
+    padding:12px;
     border:none;
-    color:white;
-    padding:14px;
     border-radius:10px;
+    background:#ef4444;
+    color:white;
     cursor:pointer;
-    font-size:15px;
+    font-size:16px;
 }
 
 .logout:hover{
@@ -87,21 +76,10 @@ body{
     margin-bottom:35px;
 }
 
-.header h1{
-    font-size:34px;
-    color:#1e293b;
-}
-
-.header p{
-    color:#64748b;
-}
-
 .profile img{
     width:60px;
     height:60px;
     border-radius:50%;
-    border:4px solid white;
-    box-shadow:0 10px 25px rgba(0,0,0,.15);
 }
 
 /* Cards */
@@ -109,125 +87,87 @@ body{
 .cards{
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:25px;
-    margin-bottom:35px;
+    gap:20px;
 }
 
 .card{
     padding:25px;
-    border-radius:20px;
+    border-radius:15px;
     color:white;
-    transition:.4s;
-    cursor:pointer;
-    box-shadow:0 20px 40px rgba(0,0,0,.1);
+    transition:.3s;
 }
 
 .card:hover{
-    transform:translateY(-10px) scale(1.02);
-}
-
-.card h3{
-    font-weight:500;
-    margin-bottom:20px;
+    transform:translateY(-6px);
 }
 
 .card h2{
-    font-size:40px;
-}
-
-.card span{
-    opacity:.9;
+    margin:15px 0;
+    font-size:34px;
 }
 
 .purple{
-    background:linear-gradient(135deg,#7c3aed,#9333ea);
+    background:#7c3aed;
 }
 
 .blue{
-    background:linear-gradient(135deg,#2563eb,#06b6d4);
+    background:#2563eb;
 }
 
 .orange{
-    background:linear-gradient(135deg,#f97316,#fb923c);
+    background:#ea580c;
 }
 
 .green{
-    background:linear-gradient(135deg,#16a34a,#22c55e);
+    background:#16a34a;
 }
 
 /* Bottom */
 
 .bottom{
+    margin-top:35px;
     display:grid;
     grid-template-columns:2fr 1fr;
     gap:25px;
 }
 
-/* Activity */
-
 .activity,
 .actions{
-    background:rgba(255,255,255,.8);
-    backdrop-filter:blur(15px);
-    border-radius:20px;
+    background:white;
     padding:25px;
-    box-shadow:0 10px 30px rgba(0,0,0,.08);
-}
-
-.activity h2,
-.actions h2{
-    margin-bottom:20px;
-    color:#1e293b;
+    border-radius:15px;
 }
 
 .item{
     display:flex;
+    gap:18px;
     align-items:center;
-    gap:15px;
-    padding:18px 0;
-    border-bottom:1px solid #eee;
-}
-
-.item:last-child{
-    border-bottom:none;
+    margin-top:20px;
 }
 
 .item span{
-    width:50px;
-    height:50px;
-    background:#eef2ff;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    border-radius:50%;
-    font-size:22px;
+    font-size:28px;
 }
-
-/* Buttons */
 
 .actions{
     display:flex;
     flex-direction:column;
-    gap:15px;
 }
 
 .actions button{
+    margin-top:15px;
+    padding:14px;
     border:none;
-    padding:16px;
-    border-radius:12px;
-    background:#6366f1;
+    border-radius:10px;
+    background:#4f46e5;
     color:white;
     cursor:pointer;
     transition:.3s;
-    font-size:15px;
 }
 
 .actions button:hover{
     background:#4338ca;
-    transform:translateY(-3px);
 }
-
-/* Responsive */
 
 @media(max-width:900px){
 

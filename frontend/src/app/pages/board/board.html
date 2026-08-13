@@ -1,1 +1,92 @@
-<p>board works!</p>
+<div class="app">
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+
+    <div class="logo">
+      🚀 WhiteBoard AI
+    </div>
+
+    <div class="board-name">
+      <input
+        type="text"
+        formControlName="title"
+        placeholder="Enter Board Name...."
+      >
+    </div>
+
+    <div class="nav-actions">
+
+      <button>💾 Save</button>
+
+      <button>👥 Share</button>
+
+      <div class="user">
+        KH
+      </div>
+
+    </div>
+
+  </header>
+
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Left Toolbar -->
+    <aside class="toolbar">
+
+      <button>🖱️</button>
+      <button>✋</button>
+      <button>🖊️</button>
+      <button>⬜</button>
+      <button>⭕</button>
+      <button>📏</button>
+      <button>T</button>
+      <button>🖼️</button>
+      <button>🗑️</button>
+
+    </aside>
+
+
+    <!-- Canvas -->
+    <section class="canvas-wrapper">
+
+      <canvas id="boardCanvas"></canvas>
+
+      <div class="users">
+        <div class="avatar">K</div>
+        <div class="avatar">R</div>
+      </div>
+
+    </section>
+
+
+    <!-- Right Panel -->
+    <aside class="right-panel">
+
+      <button>🤖 AI</button>
+
+      <button>💬 Chat</button>
+
+      <button>📄 Layers</button>
+
+      <button>⚙️</button>
+
+    </aside>
+
+  </div>
+
+
+  <!-- Footer -->
+  <footer class="footer">
+
+      <span>100%</span>
+
+      <span>Ready ●</span>
+
+      <span>Mouse : (0 , 0)</span>
+
+  </footer>
+
+</div>

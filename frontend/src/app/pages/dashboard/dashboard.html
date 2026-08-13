@@ -3,7 +3,7 @@
   <!-- Sidebar -->
   <aside class="sidebar">
 
-    <h2 class="logo">🚀 Whiteboard</h2>
+    <h2 class="logo">🚀 WhiteBoard AI</h2>
 
     <nav>
       <a class="active">🏠 Dashboard</a>
@@ -14,7 +14,9 @@
       <a>⚙️ Settings</a>
     </nav>
 
-    <button class="logout" (click)="logout()">Logout</button>
+    <button class="logout" (click)="logout()">
+      Logout
+    </button>
 
   </aside>
 
@@ -26,87 +28,84 @@
 
       <div>
         <h1>Welcome Back 👋</h1>
-        <p>Manage your whiteboard workspace efficiently.</p>
+        <p>Manage your collaborative whiteboards.</p>
       </div>
 
       <div class="profile">
-        <img src="https://i.pravatar.cc/150?img=5">
+        <img src="https://i.pravatar.cc/150?img=5" alt="Profile">
       </div>
 
     </div>
 
     <!-- Cards -->
+
     <div class="cards">
 
       <div class="card purple">
-        <h3>Boards</h3>
-        <h2>18</h2>
-        <span>+3 This Week</span>
+        <h3>Total Boards</h3>
+        <h2>{{stats.boards}}</h2>
+        <span>Created Boards</span>
       </div>
 
       <div class="card blue">
         <h3>Members</h3>
-        <h2>42</h2>
-        <span>+8 Active</span>
+        <h2>{{stats.members}}</h2>
+        <span>Workspace Members</span>
       </div>
 
       <div class="card orange">
-        <h3>Tasks</h3>
-        <h2>124</h2>
-        <span>92% Done</span>
+        <h3>Messages</h3>
+        <h2>{{stats.messages}}</h2>
+        <span>Chat Messages</span>
       </div>
 
       <div class="card green">
-        <h3>Messages</h3>
-        <h2>67</h2>
-        <span>12 Unread</span>
+        <h3>Meetings</h3>
+        <h2>{{stats.meetings}}</h2>
+        <span>Video Sessions</span>
       </div>
 
     </div>
 
-    <!-- Bottom -->
+    <!-- Bottom Section -->
+
     <div class="bottom">
 
-      <!-- Activity -->
+      <!-- Recent Activity -->
+
       <div class="activity">
 
         <h2>Recent Activity</h2>
 
-        <div class="item">
-          <span>🎨</span>
-          <div>
-            <b>Khushi</b>
-            <p>Created UI Design Board</p>
-          </div>
-        </div>
+        <div class="item" *ngFor="let item of activities">
 
-        <div class="item">
-          <span>👨‍💻</span>
-          <div>
-            <b>Aryan</b>
-            <p>Joined Workspace</p>
-          </div>
-        </div>
+          <span>{{item.icon}}</span>
 
-        <div class="item">
-          <span>📤</span>
           <div>
-            <b>You</b>
-            <p>Uploaded Project Files</p>
+
+            <b>{{item.user}}</b>
+
+            <p>{{item.action}}</p>
+
           </div>
+
         </div>
 
       </div>
 
-      <!-- Quick Action -->
+      <!-- Quick Actions -->
+
       <div class="actions">
 
         <h2>Quick Actions</h2>
 
-        <button>Create Board</button>
-        <button>Invite Team</button>
-        <button>Video Meeting</button>
-        <button>Share Workspace</button>
+        <button (click)="createBoard()">Create Board</button>
+
+        <button (click)="inviteTeam()">Invite Team</button>
+
+        <button (click)="videoMeeting()">Video Meeting</button>
+
+        <button (click)="shareWorkspace()">Share Workspace</button>
 
       </div>
 
