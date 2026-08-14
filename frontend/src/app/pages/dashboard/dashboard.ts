@@ -3,7 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../services/authService/auth';
 import { CreateBoardModal } from '../../components/create-board-modal/create-board-modal';
 import { CommonModule } from '@angular/common';
-import { Board } from '../../services/boardService/board';
+import { BoardService } from '../../services/boardService/boardService';
 
 @Component({
   selector: 'app-dashboard',
@@ -16,7 +16,7 @@ export class Dashboard {
 
   constructor(
     private auth: Auth,
-    private boardService:Board,
+    private boardService:BoardService,
     private router: Router
   ) {}
 
@@ -26,7 +26,7 @@ export class Dashboard {
 
   activeTab: string = 'dashboard';
   boards:any[]=[]
-  
+
   loadBoards(){
     this.boardService.getBoards().subscribe({
       next:(res:any)=>{
@@ -37,7 +37,20 @@ export class Dashboard {
       }
     })
   }
-  
+  onBoardCreated(){
+    this.showCreateModal = false;
+    this.loadBoards();
+  }
+
+  deleteBoard(id:any){
+    this.boardService.deleteBoard(id).subscribe({
+      next:(res:any)=>{
+        console.log("Board delete Successfully",res);
+        this.loadBoards();
+      }
+    })
+  }
+
   // Dashboard Statistics
   stats = {
     boards: 18,
@@ -77,8 +90,8 @@ export class Dashboard {
     this.router.navigate(['']);
   }
 
-  createBoard() {
-    console.log('Create Board');
+  openBoard(id:string) {
+    this.router.navigate(['/board',id]);
   }
 
   inviteTeam() {

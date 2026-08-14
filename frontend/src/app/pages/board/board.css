@@ -45,21 +45,21 @@ font-weight:700;
 color:#2563eb;
 }
 
-.board-name input{
+.board-name{
 
 width:320px;
 
 padding:10px;
 
-font-size:18px;
+font-size:19px;
 
 border:none;
-
-border-bottom:2px solid #ddd;
 
 outline:none;
 
 background:transparent;
+
+align-items: center;
 }
 
 .nav-actions{

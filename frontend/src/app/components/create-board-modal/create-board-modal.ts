@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Board } from '../../services/boardService/board';
+import { BoardService } from '../../services/boardService/boardService';
 import { Router } from '@angular/router';
+import { Output, EventEmitter } from '@angular/core';
 
 @Component({
   selector: 'app-create-board-modal',
@@ -11,8 +12,12 @@ import { Router } from '@angular/router';
   styleUrl: './create-board-modal.css',
 })
 export class CreateBoardModal {
-  constructor(private Board:Board,private router:Router){}
   
+  constructor(private Board:BoardService,private router:Router){}
+  
+  @Output() close = new EventEmitter<void>();
+  @Output() boardCreated = new EventEmitter<void>();
+
   title:string=""
 
   createBoard(){
@@ -20,7 +25,8 @@ export class CreateBoardModal {
     title: this.title
   }).subscribe({
       next:(res:any)=>{
-        this.router.navigate(['dashboard']);
+        this.boardCreated.emit();   // parent ko batao
+        this.close.emit();
         alert("Registered Successfully");
       },
       error:(err)=>{
@@ -28,4 +34,9 @@ export class CreateBoardModal {
       }
     })
   }
+
+  closeModal(){
+   this.close.emit();
+  }
+  
 }

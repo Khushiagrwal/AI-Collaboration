@@ -3,7 +3,7 @@ import { inject, Injectable } from "@angular/core";
 import { environment } from "../../../environment/environment";
 
 @Injectable({providedIn:"root"})
-export class Board {
+export class BoardService {
     private http=inject(HttpClient);
     private api=environment.BACKEND_URL;
 

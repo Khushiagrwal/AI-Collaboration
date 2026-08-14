@@ -17,7 +17,7 @@ export const routes: Routes = [
     canActivate:[authGuard]
   },
   {
-    path: 'board',
+    path: 'board/:id',
     loadComponent:()=>import("./pages/board/board").then(m=>m.Board),
     canActivate:[authGuard]
   },

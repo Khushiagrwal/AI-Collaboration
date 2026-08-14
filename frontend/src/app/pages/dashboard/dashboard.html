@@ -53,7 +53,7 @@
 
   <!-- Main -->
   <main class="main">
-
+<div *ngIf="activeTab==='dashboard'">
     <!-- Header -->
     <div class="header">
 
@@ -141,15 +141,9 @@
       </div>
 
     </div>
-
-  </main>
-
+    <!-- Boards Section -->
 </div>
-
-<app-create-board-modal *ngIf="showCreateModal"></app-create-board-modal>
-<!-- Boards Section -->
-
-<div class="boards-section">
+<div *ngIf="activeTab==='boards'">
 
   <div class="boards-header">
 
@@ -186,7 +180,7 @@
 
         <div class="board-actions">
 
-          <button class="open-btn">
+          <button class="open-btn" (click)="openBoard(board._id)">
             Open
           </button>
 
@@ -194,7 +188,7 @@
             Edit
           </button>
 
-          <button class="delete-btn">
+          <button class="delete-btn" (click)="deleteBoard(board._id)">
             Delete
           </button>
 
@@ -207,3 +201,14 @@
   </div>
 
 </div>
+
+  </main>
+
+</div>
+
+<app-create-board-modal
+    *ngIf="showCreateModal"
+    (close)="showCreateModal=false"
+    (boardCreated)="onBoardCreated()">
+    
+</app-create-board-modal>
