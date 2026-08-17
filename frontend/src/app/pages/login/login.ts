@@ -20,7 +20,7 @@ export class Login {
   submit(){
     this.auth.login(this.loginForm.value).subscribe({
       next:(res:any)=>{
-        console.log(res)
+        console.log("THIS IS LOGIN ",res)
         localStorage.setItem("token",res.token)
         this.router.navigate(['dashboard'])
         alert("Login Successfully")

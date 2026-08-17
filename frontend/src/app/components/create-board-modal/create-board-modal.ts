@@ -16,7 +16,7 @@ export class CreateBoardModal {
   constructor(private Board:BoardService,private router:Router){}
   
   @Output() close = new EventEmitter<void>();
-  @Output() boardCreated = new EventEmitter<void>();
+  @Output() boardCreated = new EventEmitter<any>();
 
   title:string=""
 
@@ -25,9 +25,8 @@ export class CreateBoardModal {
     title: this.title
   }).subscribe({
       next:(res:any)=>{
-        this.boardCreated.emit();   // parent ko batao
+        this.boardCreated.emit(res.board);   // parent ko batao with created board
         this.close.emit();
-        alert("Registered Successfully");
       },
       error:(err)=>{
         alert(err.error?.message)

@@ -5,9 +5,9 @@ import { CreateBoardModal } from '../../components/create-board-modal/create-boa
 import { CommonModule } from '@angular/common';
 import { BoardService } from '../../services/boardService/boardService';
 
+
 @Component({
   selector: 'app-dashboard',
-  standalone: true,
   imports: [RouterLink,CreateBoardModal,CommonModule],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
@@ -37,16 +37,21 @@ export class Dashboard {
       }
     })
   }
-  onBoardCreated(){
+  onBoardCreated(createdBoard?: any){
     this.showCreateModal = false;
-    this.loadBoards();
+    if (createdBoard) {
+      // add the new board to the beginning of the list for immediate UI update
+      this.boards = [createdBoard, ...this.boards];
+    } else {
+      this.loadBoards();
+    }
   }
 
   deleteBoard(id:any){
     this.boardService.deleteBoard(id).subscribe({
       next:(res:any)=>{
+        this.loadBoards()
         console.log("Board delete Successfully",res);
-        this.loadBoards();
       }
     })
   }

@@ -13,13 +13,131 @@
 
     <div class="nav-actions">
 
-      <button>💾 Save</button>
+      <button (click)="saveBoard()">💾 Save</button>
 
-      <button>👥 Share</button>
+      <button (click)="showShareModal = true" >👥 Share</button>
+      @if (showShareModal) {
 
-      <div class="user">
-        KH
+  <div class="modal-overlay">
+
+    <div class="share-modal">
+
+      <div class="modal-header">
+
+        <div>
+          <h3>Share Board</h3>
+          <p>Add people to collaborate on this board.</p>
+        </div>
+
+        <button
+          class="close-btn"
+          (click)="showShareModal = false">
+          ✕
+        </button>
+
       </div>
+
+
+      <div class="share-input">
+
+        <input
+          type="email"
+          placeholder="Enter email address"
+          [(ngModel)]="participantEmail"
+        />
+
+        <button (click)="addParticipant()">
+          Add
+        </button>
+
+      </div>
+
+
+      <div class="participants">
+
+        <h4>People with access</h4>
+
+        <!-- Owner -->
+
+        <div class="participant">
+
+          <div class="participant-avatar">
+            {{ board()?.owner?.name?.charAt(0) }}
+          </div>
+
+          <div class="participant-info">
+
+            <strong>
+              {{ board()?.owner?.name }}
+            </strong>
+
+            <span>
+              {{ board()?.owner?.email }}
+            </span>
+
+          </div>
+
+          <span class="owner-badge">
+            Owner
+          </span>
+
+        </div>
+
+
+        <!-- Participants -->
+
+        @for (
+          user of board()?.participants;
+          track user._id
+        ) {
+
+          <div class="participant">
+
+            <div class="participant-avatar">
+              {{ user.name?.charAt(0) }}
+            </div>
+
+            <div class="participant-info">
+
+              <strong>
+                {{ user.name }}
+              </strong>
+
+              <span>
+                {{ user.email }}
+              </span>
+
+            </div>
+
+          </div>
+
+        }
+
+      </div>
+
+    </div>
+
+  </div>
+
+}
+
+  <div class="user-info">
+
+    <div class="user-avatar">
+    {{ board()?.owner?.name?.charAt(0) }}
+    </div>
+
+    <div class="user-details">
+      <div class="user-name">
+      {{ board()?.owner?.name }}
+      </div>
+
+      <div class="user-email">
+      {{ board()?.owner?.email }}
+      </div>
+    </div>
+
+  </div>
 
     </div>
 
@@ -32,15 +150,21 @@
     <!-- Left Toolbar -->
     <aside class="toolbar">
 
-      <button>🖱️</button>
-      <button>✋</button>
-      <button>🖊️</button>
-      <button>⬜</button>
-      <button>⭕</button>
-      <button>📏</button>
-      <button>T</button>
-      <button>🖼️</button>
-      <button>🗑️</button>
+      <button [class.active]="activeTool === 'select'" (click)="activeTool = 'select'" >🖱️</button>
+
+      <button [class.active]="activeTool === 'hand'" (click)="activeTool = 'hand'">✋</button>
+
+      <button [class.active]="activeTool === 'pen'" (click)="activeTool = 'pen'" >🖊️</button>
+
+      <button [class.active]="activeTool === 'eraser'" (click)="activeTool = 'eraser'">⬜</button>
+
+      <button [class.active]="activeTool === 'circle'" (click)="activeTool = 'circle'">⭕</button>
+
+      <button [class.active]="activeTool === 'line'" (click)="activeTool = 'line'">📏</button>
+
+      <button [class.active]="activeTool === 'text'" (click)="activeTool = 'text'">T</button>
+
+      <button (click)="clearCanvas()">🗑️</button>
 
     </aside>
 
@@ -48,7 +172,25 @@
     <!-- Canvas -->
     <section class="canvas-wrapper">
 
-      <canvas id="boardCanvas"></canvas>
+      <canvas
+        #boardCanvas
+        (mousedown)="startDrawing($event)"
+        (mousemove)="draw($event)"
+        (mouseup)="stopDrawing()"
+        (mouseleave)="stopDrawing()">
+      </canvas>
+      @if (isTyping) {
+      <input
+        #textInput
+        class="canvas-text-input"
+        [style.left.px]="textX"
+        [style.top.px]="textY"
+        [(ngModel)]="currentText"
+        (keydown.enter)="finishText()"
+        (keydown.escape)="cancelText()"
+        autofocus
+      />
+      }
 
       <div class="users">
         <div class="avatar">K</div>
@@ -81,7 +223,7 @@
 
       <span>Ready ●</span>
 
-      <span>Mouse : (0 , 0)</span>
+      <span>Mouse : (0,0)</span>
 
   </footer>
 

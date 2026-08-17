@@ -209,6 +209,6 @@
 <app-create-board-modal
     *ngIf="showCreateModal"
     (close)="showCreateModal=false"
-    (boardCreated)="onBoardCreated()">
+  (boardCreated)="onBoardCreated($event)">
     
 </app-create-board-modal>

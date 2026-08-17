@@ -16,7 +16,6 @@ export class BoardService {
     } 
 
     createBoard(data:any){
-        console.log("oue")
         return this.http.post(`${this.api}/board/`,data)
     }
 
@@ -26,5 +25,9 @@ export class BoardService {
 
     deleteBoard(id:Number){
         return this.http.delete(`${this.api}/board/${id}`)
+    }
+
+    addParticipant(boardId: string, email: string) {
+        return this.http.post(`${this.api}/board/${boardId}/participants`,{ email });
     }
 }
