@@ -31,7 +31,6 @@ export class Board implements OnInit, AfterViewInit {
   private route = inject(ActivatedRoute);
   private boardService = inject(BoardService);
   private socketService=inject(SocketService);
-
   board = signal<any>(null);
   activeTool:
     | 'select'
@@ -44,34 +43,59 @@ export class Board implements OnInit, AfterViewInit {
 
   color = 'purple';
   isDrawing = false;
-
   private startX = 0;
   private startY = 0;
-
   private snapshot!: ImageData;
   isTyping = false;
   currentText = '';
   textX = 0;
   textY = 0;
-
   showShareModal = false;
   participantEmail = '';
+  private remoteLastX: number | null = null;
+  private remoteLastY: number | null = null;
+  private currentX = 0;
+  private currentY = 0;
 
   @ViewChild('boardCanvas')
   canvas!: ElementRef<HTMLCanvasElement>;
-
   private ctx!: CanvasRenderingContext2D;
-
   ngOnInit(): void {
 
     const id = this.route.snapshot.paramMap.get('id');
-
     if (id) {
       this.loadBoard(id);
       this.socketService.joinBoard(id)
     }
-  }
+    this.socketService.onDraw((data)=>{
+      // console.log('Remote draw received:', data);
+      this.drawRemote(data);
+    })
 
+    this.socketService.onDrawStart((data) => {
+      this.remoteLastX = data.x;
+      this.remoteLastY = data.y;
+    });
+
+    this.socketService.onDrawEnd(() => {
+      this.remoteLastX = null;
+      this.remoteLastY = null;
+    });
+
+    this.socketService.onDrawShape((data) => {
+      this.drawRemoteShape(data);
+    });
+
+    this.socketService.onClearBoard(() => {
+      this.ctx.clearRect(
+      0,
+      0,
+      this.canvas.nativeElement.width,
+      this.canvas.nativeElement.height
+      );
+    });
+
+  }
 
   ngAfterViewInit(): void {
 
@@ -84,6 +108,117 @@ export class Board implements OnInit, AfterViewInit {
     this.ctx.lineJoin = 'round';
     this.ctx.strokeStyle = this.color;
     this.ctx.lineWidth = 2;
+  }
+
+  private drawRemoteShape(data: any): void {
+
+  if (data.tool === 'line') {
+
+    this.ctx.save();
+
+    this.ctx.globalCompositeOperation = 'source-over';
+
+    this.ctx.strokeStyle = data.color;
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
+
+    this.ctx.beginPath();
+
+    this.ctx.moveTo(
+      data.startX,
+      data.startY
+    );
+
+    this.ctx.lineTo(
+      data.endX,
+      data.endY
+    );
+
+    this.ctx.stroke();
+  }
+  if (data.tool === 'circle') {
+
+    const radiusX = data.endX - data.startX;
+    const radiusY = data.endY - data.startY;
+
+    const centerX =
+      data.startX + radiusX / 2;
+
+    const centerY =
+      data.startY + radiusY / 2;
+
+    this.ctx.beginPath();
+
+    this.ctx.ellipse(
+      centerX,
+      centerY,
+      Math.abs(radiusX / 2),
+      Math.abs(radiusY / 2),
+      0,
+      0,
+      Math.PI * 2
+    );
+
+    this.ctx.stroke();
+  }
+  if (data.tool === 'text') {
+
+  this.ctx.font = '12px Arial';
+  this.ctx.fillStyle = data.color;
+
+  this.ctx.fillText(
+    data.text,
+    data.x,
+    data.y + 20
+  );
+}
+    this.ctx.restore();
+
+  }
+
+  private drawRemote(data: any): void {
+
+  if (this.remoteLastX === null || this.remoteLastY === null) {
+    this.remoteLastX = data.x;
+    this.remoteLastY = data.y;
+    return;
+  }
+
+  this.ctx.save();
+
+  if (data.tool === 'eraser') {
+
+    this.ctx.globalCompositeOperation = 'destination-out';
+    this.ctx.lineWidth = 20;
+
+  } else {
+
+    this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.strokeStyle = data.color;
+    this.ctx.lineWidth = 2;
+  }
+
+  this.ctx.lineCap = 'round';
+  this.ctx.lineJoin = 'round';
+
+  this.ctx.beginPath();
+
+  this.ctx.moveTo(
+    this.remoteLastX,
+    this.remoteLastY
+  );
+
+  this.ctx.lineTo(
+    data.x,
+    data.y
+  );
+
+  this.ctx.stroke();
+
+  this.ctx.restore();
+
+  this.remoteLastX = data.x;
+  this.remoteLastY = data.y;
   }
 
   private getMousePosition(event: MouseEvent) {
@@ -104,14 +239,10 @@ export class Board implements OnInit, AfterViewInit {
   private addText(event: MouseEvent): void {
 
     const canvas = this.canvas.nativeElement;
-
     const rect = canvas.getBoundingClientRect();
-
     this.textX = event.clientX - rect.left;
     this.textY = event.clientY - rect.top;
-
     this.currentText = '';
-
     this.isTyping = true;
   }
 
@@ -123,11 +254,7 @@ export class Board implements OnInit, AfterViewInit {
 
       return;
     }
-
-    /*
-      Text ko canvas ke correct coordinate par draw karna hai.
-    */
-
+    
     const canvas = this.canvas.nativeElement;
 
     const rect = canvas.getBoundingClientRect();
@@ -149,7 +276,14 @@ export class Board implements OnInit, AfterViewInit {
       canvasX,
       canvasY + (20 * scaleY)
     );
-
+    this.socketService.drawShape({
+  boardId: this.board()?._id,
+  tool: 'text',
+  x: canvasX,
+  y: canvasY,
+  text: this.currentText,
+  color: this.color
+});
     this.currentText = '';
 
     this.isTyping = false;
@@ -167,8 +301,6 @@ export class Board implements OnInit, AfterViewInit {
     this.boardService.getBoard(id).subscribe({
 
       next: (res: any) => {
-
-        console.log('API response:', res);
 
         this.board.set(res.board);
 
@@ -233,22 +365,12 @@ export class Board implements OnInit, AfterViewInit {
     this.startX = x;
     this.startY = y;
 
-
-    // =========================
-    // SELECT
-    // =========================
-
     if (this.activeTool === 'select') {
 
       console.log('Select tool');
 
       return;
     }
-
-
-    // =========================
-    // HAND
-    // =========================
 
     if (this.activeTool === 'hand') {
 
@@ -257,22 +379,12 @@ export class Board implements OnInit, AfterViewInit {
       return;
     }
 
-
-    // =========================
-    // TEXT
-    // =========================
-
     if (this.activeTool === 'text') {
 
       this.addText(event);
 
       return;
     }
-
-
-    // =========================
-    // Drawing starts here
-    // =========================
 
     this.isDrawing = true;
 
@@ -285,53 +397,42 @@ export class Board implements OnInit, AfterViewInit {
       this.canvas.nativeElement.height
     );
 
-
-    // =========================
-    // PEN
-    // =========================
-
     if (this.activeTool === 'pen') {
 
       this.ctx.globalCompositeOperation = 'source-over';
-
       this.ctx.beginPath();
-
       this.ctx.moveTo(x, y);
-
       this.ctx.strokeStyle = this.color;
-
       this.ctx.lineWidth = 2;
-
       this.ctx.lineCap = 'round';
+      this.socketService.drawStart({
+      boardId: this.board()?._id,
+      tool: 'pen',
+      x,
+      y,
+      color: this.color
+      });
 
       return;
     }
-
-
-    // =========================
-    // ERASER
-    // =========================
 
     if (this.activeTool === 'eraser') {
 
       this.ctx.globalCompositeOperation =
         'destination-out';
-
       this.ctx.beginPath();
-
       this.ctx.moveTo(x, y);
-
       this.ctx.lineWidth = 20;
-
       this.ctx.lineCap = 'round';
+      this.socketService.drawStart({
+      boardId: this.board()?._id,
+      tool: 'eraser',
+      x,
+      y
+      });
 
       return;
     }
-
-
-    // =========================
-    // LINE
-    // =========================
 
     if (this.activeTool === 'line') {
 
@@ -344,11 +445,6 @@ export class Board implements OnInit, AfterViewInit {
 
       return;
     }
-
-
-    // =========================
-    // CIRCLE
-    // =========================
 
     if (this.activeTool === 'circle') {
 
@@ -370,39 +466,37 @@ export class Board implements OnInit, AfterViewInit {
     }
 
     const { x, y } = this.getMousePosition(event);
-
-
-    // =========================
-    // PEN
-    // =========================
-
+    this.currentX = x;
+    this.currentY = y;
     if (this.activeTool === 'pen') {
 
       this.ctx.lineTo(x, y);
-
       this.ctx.stroke();
+
+      this.socketService.draw({
+      boardId: this.board()?._id,
+      tool: 'pen',
+      x: x,
+      y: y,
+      color: this.color
+      });
 
       return;
     }
-
-
-    // =========================
-    // ERASER
-    // =========================
 
     if (this.activeTool === 'eraser') {
 
       this.ctx.lineTo(x, y);
 
       this.ctx.stroke();
-
+      this.socketService.draw({
+      boardId: this.board()?._id,
+      tool: 'eraser',
+      x,
+      y
+      });
       return;
     }
-
-
-    // =========================
-    // LINE
-    // =========================
 
     if (this.activeTool === 'line') {
 
@@ -412,32 +506,21 @@ export class Board implements OnInit, AfterViewInit {
         0,
         0
       );
-
       this.ctx.beginPath();
 
       this.ctx.moveTo(
         this.startX,
         this.startY
       );
-
       this.ctx.lineTo(
         x,
         y
       );
-
       this.ctx.strokeStyle = this.color;
-
       this.ctx.lineWidth = 2;
-
       this.ctx.stroke();
-
       return;
     }
-
-
-    // =========================
-    // CIRCLE
-    // =========================
 
     if (this.activeTool === 'circle') {
 
@@ -483,22 +566,51 @@ export class Board implements OnInit, AfterViewInit {
 
   stopDrawing(): void {
 
-    if (!this.isDrawing) {
-      return;
-    }
-
-    this.isDrawing = false;
-
-    this.ctx.closePath();
-
-    /*
-      Eraser ke baad canvas ko
-      normal drawing mode mein lao.
-    */
-
-    this.ctx.globalCompositeOperation =
-      'source-over';
+  if (!this.isDrawing) {
+    return;
   }
+
+  this.isDrawing = false;
+
+  if (this.activeTool === 'line') {
+
+    this.socketService.drawShape({
+      boardId: this.board()?._id,
+      tool: 'line',
+      startX: this.startX,
+      startY: this.startY,
+      endX: this.currentX,
+      endY: this.currentY,
+      color: this.color
+    });
+
+  } else if (
+    this.activeTool === 'pen' ||
+    this.activeTool === 'eraser'
+  ) {
+
+    this.socketService.drawEnd({
+      boardId: this.board()?._id,
+      tool: this.activeTool
+    });
+  }else if (this.activeTool === 'circle') {
+
+  this.socketService.drawShape({
+    boardId: this.board()?._id,
+    tool: 'circle',
+    startX: this.startX,
+    startY: this.startY,
+    endX: this.currentX,
+    endY: this.currentY,
+    color: this.color
+  });
+}
+
+  this.ctx.closePath();
+
+  this.ctx.globalCompositeOperation =
+    'source-over';
+}
 
   clearCanvas(): void {
 
@@ -509,6 +621,9 @@ export class Board implements OnInit, AfterViewInit {
       0,
       canvas.width,
       canvas.height
+    );
+    this.socketService.clearBoard(
+    this.board()?._id
     );
   }
 
@@ -581,11 +696,6 @@ export class Board implements OnInit, AfterViewInit {
     .addParticipant(boardId, email)
     .subscribe({
       next: (res: any) => {
-        console.log('Response from addParticipant:', res);
-        console.log('Board data:', res.board);
-        console.log('Participants:', res.board?.participants);
-        
-        // Ensure we're setting the full board object with participants
         if (res.board) {
           // Create a new object reference to trigger change detection
           this.board.set({ ...res.board });

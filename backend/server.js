@@ -39,26 +39,7 @@ const io=new Server(server,{
 });
 
 // Socket connection
-io.on("connection", (socket) => {
-
-    socket.on("disconnect", () => {
-        console.log("User disconnected:", socket.id);
-    });
-
-    socket.on("join-board", (boardId) => {
-        socket.join(boardId);
-        console.log(`${socket.id} joined board ${boardId}`);
-    });
-
-    socket.on("draw",(data)=>{
-        socket.to(data.boardId).emit("draw",data)
-    })
-
-    socket.on("disconnect", () => {
-        console.log("User disconnected:");
-    });
-
-});
+require("./src/sockets/socket")(io);
 
 app.use("/api/auth/",authRoute);
 app.use("/api/board/",boardRoute);
