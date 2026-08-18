@@ -7,7 +7,7 @@ import { environment } from "../../../environment/environment";
 })
 export class SocketService {
     private socket:Socket;
-    private api='http://localhost:8080/';
+    private api=environment.BACKEND_URL.replace("/api", "");
 
     constructor() {
     this.socket = io(this.api);
