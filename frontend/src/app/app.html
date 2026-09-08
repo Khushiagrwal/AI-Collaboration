@@ -1,0 +1,22 @@
+<router-outlet />
+
+<div class="notification-stack" aria-live="polite" aria-atomic="true">
+	<div
+		class="notification"
+		*ngFor="let notification of notifications.notifications()"
+		[class.success]="notification.type === 'success'"
+		[class.error]="notification.type === 'error'"
+		[class.info]="notification.type === 'info'">
+		<span class="notification-icon">
+			{{ notification.type === 'success' ? '✓' : notification.type === 'error' ? '!' : 'i' }}
+		</span>
+		<span class="notification-message">{{ notification.message }}</span>
+		<button
+			type="button"
+			class="notification-close"
+			aria-label="Dismiss notification"
+			(click)="notifications.dismiss(notification.id)">
+			×
+		</button>
+	</div>
+</div>

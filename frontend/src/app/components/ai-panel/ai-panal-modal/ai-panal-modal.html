@@ -1,0 +1,69 @@
+<div class="ai-modal-overlay">
+
+  <div class="ai-modal">
+
+```
+<!-- Header -->
+<div class="ai-modal-header">
+
+  <div class="ai-title">
+    <div class="ai-icon">🤖</div>
+
+    <div>
+      <h2>WhiteBoard AI</h2>
+      <p>Create diagrams using natural language</p>
+    </div>
+  </div>
+
+  <button type="button" class="close-btn" (click)="closeModal()">
+    ✕
+  </button>
+
+</div>
+
+
+<!-- Body -->
+<div class="ai-modal-body">
+
+  <label for="aiPrompt">What do you want to create?</label>
+
+  <textarea
+    id="aiPrompt"  [(ngModel)]="aiPrompt"
+    placeholder="Describe your diagram...
+
+Example:
+Create a login system with Angular frontend,
+Node.js backend and MongoDB database."
+></textarea>
+
+  <div class="prompt-hint">
+    💡 Be specific about the components and their relationships.
+  </div>
+
+</div>
+
+
+<!-- Footer -->
+<div class="ai-modal-footer">
+
+  <button class="cancel-btn">
+    Cancel
+  </button>
+
+ 
+  <button class="generate-btn"
+  (click)="generateDiagram()"
+  [disabled]="!aiPrompt.trim() || aiLoading">
+
+  @if (aiLoading) {
+    Generating...
+  } @else {
+    ✨ Generate Diagram
+  }
+
+</button>
+
+</div>
+  </div>
+
+</div>

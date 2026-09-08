@@ -1,0 +1,96 @@
+<div class="invite-page">
+
+  <div class="invite-card">
+
+    <div class="invite-icon">
+      <span>✦</span>
+    </div>
+
+    @if (loading) {
+      <div class="invite-content">
+        <h1>Checking invitation...</h1>
+        <p class="description">Please wait while we verify your invitation link.</p>
+      </div>
+    }
+
+    @if (invitation && !wrongAccount) {
+
+      <div class="invite-content">
+
+        <p class="eyebrow">BOARD INVITATION</p>
+
+        <h1>You're invited to collaborate</h1>
+
+        <p class="description">
+          You’ve been invited to join this collaborative whiteboard.
+        </p>
+
+        <div class="board-preview">
+
+          <div class="board-icon">
+            <span>✎</span>
+          </div>
+
+          <div class="board-info">
+            <span class="board-label">Whiteboard</span>
+            <h2>{{ invitation.boardTitle }}</h2>
+          </div>
+
+        </div>
+
+        <div class="permission">
+
+          <div class="permission-icon">
+            <span>✓</span>
+          </div>
+
+          <div>
+            <span class="permission-label">Your access</span>
+            <strong>
+              {{ invitation.role === 'editor' ? 'Can edit' : 'Can view' }}
+            </strong>
+          </div>
+
+        </div>
+
+        <button class="accept-btn" (click)="acceptInvitation()">
+          Accept invitation
+          <span>→</span>
+        </button>
+
+        <p class="signin-note">
+          You'll need to sign in or create an account to continue.
+        </p>
+
+      </div>
+
+    }
+
+    @if (!loading && error) {
+
+      <div class="error-content">
+
+        <div class="error-icon">
+          !
+        </div>
+
+        <h1>{{ wrongAccount ? 'Wrong account signed in' : 'Invitation unavailable' }}</h1>
+
+        <p>{{ error }}</p>
+
+        <button class="back-btn" (click)="wrongAccount ? switchAccount() : goHome()">
+          {{ wrongAccount ? 'Switch account' : 'Go to homepage' }}
+        </button>
+
+      </div>
+
+    }
+
+  </div>
+
+  <p class="footer-text">
+    Secure collaboration · Your access is protected
+  </p>
+
+</div>
+

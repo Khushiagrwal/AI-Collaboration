@@ -1,0 +1,259 @@
+<div class="dashboard">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+
+    <h2 class="logo">🚀 WhiteBoard AI</h2>
+
+    <nav>
+
+  <a
+    [class.active]="activeTab==='dashboard'"
+    (click)="activeTab='dashboard'">
+    🏠 Dashboard
+  </a>
+
+  <a
+    [class.active]="activeTab==='boards'"
+    (click)="activeTab='boards'">
+    📋 Boards
+  </a>
+
+  <a
+    [class.active]="activeTab==='team'"
+    (click)="activeTab='team'">
+    👥 Team
+  </a>
+
+  <a
+    [class.active]="activeTab==='chat'"
+    (click)="activeTab='chat'">
+    💬 Chat
+  </a>
+
+  <a
+    [class.active]="activeTab==='analytics'"
+    (click)="activeTab='analytics'">
+    📊 Analytics
+  </a>
+
+  <a
+    [class.active]="activeTab==='settings'"
+    (click)="activeTab='settings'">
+    ⚙️ Settings
+  </a>
+
+</nav>
+
+    <button class="logout" (click)="logout()">
+      Logout
+    </button>
+
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+<div *ngIf="activeTab==='dashboard'">
+    <!-- Header -->
+    <div class="header">
+
+      <div>
+        <h1>Welcome back, {{ currentUser?.name || 'there' }} 👋</h1>
+        <p>Here is the latest overview of your collaborative workspace.</p>
+      </div>
+
+      <div class="profile">
+        <div class="profile-avatar">
+          {{ currentUser?.name?.charAt(0) || '?' }}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Cards -->
+
+    <div class="cards">
+
+      <div class="card purple">
+        <h3>Total Boards</h3>
+        <h2>{{ownedBoards.length}}</h2>
+        <span>Created by you</span>
+      </div>
+
+      <div class="card blue">
+        <h3>Members</h3>
+        <h2>{{totalMembers}}</h2>
+        <span>Across your boards</span>
+      </div>
+
+      <div class="card orange">
+        <h3>Messages</h3>
+        <h2>{{sharedBoards.length}}</h2>
+        <span>Shared with you</span>
+      </div>
+
+      <div class="card green">
+        <h3>Meetings</h3>
+        <h2>{{boards.length}}</h2>
+        <span>Total accessible</span>
+      </div>
+
+    </div>
+
+    <!-- Bottom Section -->
+
+    <div class="bottom">
+
+      <!-- Recent Activity -->
+
+      <div class="activity">
+
+        <h2>Recent board activity</h2>
+
+        <div class="item" *ngFor="let board of recentBoards">
+
+          <span>{{board.isOwner ? '🎨' : '🤝'}}</span>
+
+          <div>
+
+            <b>{{board.title}}</b>
+
+            <p>{{board.isOwner ? 'Created by you' : 'Shared by ' + (board.owner?.name || 'a teammate')}}</p>
+
+          </div>
+
+          <button class="activity-open" (click)="openBoard(board._id)">Open</button>
+
+        </div>
+
+        <p class="no-activity" *ngIf="!recentBoards.length">No board activity yet.</p>
+
+      </div>
+
+      <!-- Quick Actions -->
+
+      <div class="actions">
+
+        <h2>Quick Actions</h2>
+
+        <button (click)="showCreateModal=true">Create Board</button>
+
+        <button (click)="inviteTeam()">Invite Team</button>
+
+        <button (click)="videoMeeting()">Video Meeting</button>
+
+        <button (click)="shareWorkspace()">Share Workspace</button>
+
+      </div>
+
+    </div>
+    <!-- Boards Section -->
+</div>
+<div *ngIf="activeTab==='boards'">
+
+  <div class="boards-header">
+
+    <h2>📋 Your Boards</h2>
+
+    <button class="new-board-btn"
+            (click)="showCreateModal = true">
+      + New Board
+    </button>
+
+  </div>
+
+  <section class="board-group" *ngIf="ownedBoards.length">
+    <div class="group-heading">
+      <div>
+        <span class="group-kicker">YOUR WORKSPACE</span>
+        <h3>Boards you created</h3>
+      </div>
+      <span class="group-count">{{ ownedBoards.length }} boards</span>
+    </div>
+
+    <div class="boards-grid">
+      <div class="board-card owned-board" *ngFor="let board of ownedBoards">
+
+      <div class="board-icon">
+        📄
+      </div>
+
+      <h3>{{ board.title }}</h3>
+
+      <span class="access-badge owner-badge">Owner</span>
+
+      <p>
+        Last Updated:
+        {{ board.updatedAt | date:'mediumDate' }}
+      </p>
+
+      <div class="board-footer">
+
+        <span>
+          👥 {{ board.participants.length }} Members
+        </span>
+
+        <div class="board-actions">
+
+          <button class="open-btn" (click)="openBoard(board._id)">
+            Open
+          </button>
+
+          <button class="edit-btn">
+            Edit
+          </button>
+
+          <button class="delete-btn" (click)="deleteBoard(board._id)">
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+    </div>
+  </section>
+
+  <section class="board-group shared-group" *ngIf="sharedBoards.length">
+    <div class="group-heading">
+      <div>
+        <span class="group-kicker">COLLABORATION</span>
+        <h3>Boards shared with you</h3>
+      </div>
+      <span class="group-count">{{ sharedBoards.length }} boards</span>
+    </div>
+
+    <div class="boards-grid">
+      <div class="board-card shared-board" *ngFor="let board of sharedBoards">
+        <div class="board-icon shared-icon">🤝</div>
+        <h3>{{ board.title }}</h3>
+        <span class="access-badge shared-badge">Shared by {{ board.owner?.name || 'a teammate' }}</span>
+        <p>Last Updated: {{ board.updatedAt | date:'mediumDate' }}</p>
+        <div class="board-footer">
+          <span>👥 {{ board.participants?.length || 0 }} Members</span>
+          <div class="board-actions">
+            <button class="open-btn" (click)="openBoard(board._id)">Open</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="empty-boards" *ngIf="!boards.length">
+    <strong>No boards yet</strong>
+    <p>Create your first board to start collaborating.</p>
+  </div>
+
+</div>
+
+  </main>
+
+</div>
+
+<app-create-board-modal
+    *ngIf="showCreateModal"
+    (close)="showCreateModal=false"
+  (boardCreated)="onBoardCreated($event)">
+    
+</app-create-board-modal>
