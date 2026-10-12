@@ -7,15 +7,15 @@ module.exports = (io) => {
     });
 
     socket.on("draw-start", (data) => {
-        socket.to(data.boardId).emit("draw-start", data);
+        socket.to(data.boardId).emit("draw-start", { ...data, socketId: socket.id });
     });
 
     socket.on("draw", (data) => {
-        socket.to(data.boardId).emit("draw", data);
+        socket.to(data.boardId).emit("draw", { ...data, socketId: socket.id });
     });
 
     socket.on("draw-end", (data) => {
-        socket.to(data.boardId).emit("draw-end", data);
+        socket.to(data.boardId).emit("draw-end", { ...data, socketId: socket.id });
     });
 
     socket.on("draw-shape", (data) => {

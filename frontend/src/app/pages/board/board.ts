@@ -84,8 +84,7 @@ export class Board implements OnInit, AfterViewInit {
   inviteStatus = '';
   inviteError = '';
   linkCopied = false;
-  private remoteLastX: number | null = null;
-  private remoteLastY: number | null = null;
+  private remoteStrokePoints = new Map<string, { x: number; y: number }>();
   private currentX = 0;
   private currentY = 0;
   remoteCursors = signal<Record<string, any>>({});
@@ -122,18 +121,15 @@ export class Board implements OnInit, AfterViewInit {
       this.socketService.joinBoard(id)
     }
     this.socketService.onDraw((data) => {
-      // console.log('Remote draw received:', data);
       this.drawRemote(data);
     })
 
     this.socketService.onDrawStart((data) => {
-      this.remoteLastX = data.x;
-      this.remoteLastY = data.y;
+      this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
     });
 
-    this.socketService.onDrawEnd(() => {
-      this.remoteLastX = null;
-      this.remoteLastY = null;
+    this.socketService.onDrawEnd((data) => {
+      this.remoteStrokePoints.delete(data.socketId);
     });
 
     this.socketService.onDrawShape((data) => {
@@ -157,6 +153,7 @@ export class Board implements OnInit, AfterViewInit {
     });
 
     this.socketService.onCursorLeave((data) => {
+      this.remoteStrokePoints.delete(data.socketId);
       this.remoteCursors.update(cursors => {
         const updated = { ...cursors };
         delete updated[data.socketId];
@@ -257,10 +254,9 @@ export class Board implements OnInit, AfterViewInit {
   }
 
   private drawRemote(data: any): void {
-
-    if (this.remoteLastX === null || this.remoteLastY === null) {
-      this.remoteLastX = data.x;
-      this.remoteLastY = data.y;
+    const previousPoint = this.remoteStrokePoints.get(data.socketId);
+    if (!previousPoint) {
+      this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
       return;
     }
 
@@ -283,10 +279,7 @@ export class Board implements OnInit, AfterViewInit {
 
     this.ctx.beginPath();
 
-    this.ctx.moveTo(
-      this.remoteLastX,
-      this.remoteLastY
-    );
+    this.ctx.moveTo(previousPoint.x, previousPoint.y);
 
     this.ctx.lineTo(
       data.x,
@@ -297,8 +290,7 @@ export class Board implements OnInit, AfterViewInit {
 
     this.ctx.restore();
 
-    this.remoteLastX = data.x;
-    this.remoteLastY = data.y;
+    this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
   }
 
   private getMousePosition(event: MouseEvent) {
@@ -528,8 +520,6 @@ export class Board implements OnInit, AfterViewInit {
     if (this.activeTool === 'pen') {
 
       this.ctx.globalCompositeOperation = 'source-over';
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, y);
       this.ctx.strokeStyle = this.color;
       this.ctx.lineWidth = 2;
       this.ctx.lineCap = 'round';
@@ -560,8 +550,6 @@ export class Board implements OnInit, AfterViewInit {
 
       this.ctx.globalCompositeOperation =
         'destination-out';
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, y);
       this.ctx.lineWidth = 20;
       this.ctx.lineCap = 'round';
       this.socketService.drawStart({
@@ -720,8 +708,12 @@ export class Board implements OnInit, AfterViewInit {
 
     if (this.activeTool === 'pen') {
 
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.startX, this.startY);
       this.ctx.lineTo(x, y);
       this.ctx.stroke();
+      this.startX = x;
+      this.startY = y;
       this.activePenElement?.points?.push({ x, y });
 
       this.socketService.draw({
@@ -737,9 +729,12 @@ export class Board implements OnInit, AfterViewInit {
 
     if (this.activeTool === 'eraser') {
 
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.startX, this.startY);
       this.ctx.lineTo(x, y);
-
       this.ctx.stroke();
+      this.startX = x;
+      this.startY = y;
       this.socketService.draw({
         boardId: this.board()?._id,
         tool: 'eraser',
