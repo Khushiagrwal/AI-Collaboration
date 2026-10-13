@@ -7,6 +7,7 @@ import {
   signal,
   ViewChild
 } from '@angular/core';
+import { CommonModule } from '@angular/common';
 
 import {
   FormsModule,
@@ -14,7 +15,7 @@ import {
 } from '@angular/forms';
 
 import { Canva } from '../../services/canvas/canva';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BoardService } from '../../services/boardService/boardService';
 import { SocketService } from '../../services/SocketService/socketService';
 import { InvitationService } from '../../services/invitation/invite';
@@ -26,8 +27,10 @@ import { CanvasElement } from '../../models/canvas-element.model';
   selector: 'app-board',
   standalone: true,
   imports: [
+    CommonModule,
     ReactiveFormsModule,
     FormsModule,
+    RouterLink,
     AiPanalModal
   ],
   templateUrl: './board.html',
@@ -56,7 +59,7 @@ export class Board implements OnInit, AfterViewInit {
     | 'line'
     | 'text' = 'select';
 
-  color = '#7c3aed';
+  color = '#7955d9';
   showColorPicker = false;
   readonly colorPresets = [
     '#111827',
@@ -66,7 +69,7 @@ export class Board implements OnInit, AfterViewInit {
     '#22c55e',
     '#06b6d4',
     '#3b82f6',
-    '#7c3aed',
+    '#7955d9',
     '#ec4899'
   ];
   isDrawing = false;
@@ -90,6 +93,10 @@ export class Board implements OnInit, AfterViewInit {
   remoteCursors = signal<Record<string, any>>({});
   private lastCursorSent = 0;
   showAiModal = false;
+  pendingAiDiagram = signal<any | null>(null);
+  saveStatus = 'Ready to save';
+  isSaving = false;
+  boardLoadError = false;
   selectedElement = signal<CanvasElement | null>(null);
   isDragging = false;
 
@@ -99,6 +106,24 @@ export class Board implements OnInit, AfterViewInit {
 
   get remoteCursorEntries() {
     return Object.entries(this.remoteCursors());
+  }
+
+  get collaborators(): any[] {
+    const people = [this.board()?.owner, ...(this.board()?.participants ?? [])]
+      .filter(Boolean);
+    const seen = new Set<string>();
+    return people.filter(person => {
+      const key = String(person._id ?? person.email ?? person.name ?? '');
+      if (!key || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }
+
+  get pendingDiagramNodes(): any[] {
+    return (this.pendingAiDiagram()?.nodes ?? []).slice(0, 4);
   }
 
   selectColor(color: string): void {
@@ -392,7 +417,7 @@ export class Board implements OnInit, AfterViewInit {
     this.boardService.getBoard(id).subscribe({
 
       next: (res: any) => {
-
+        this.boardLoadError = false;
         this.board.set(res.board);
         this.currentUser.set(res.currentUser);
         this.isOwner.set(res.isOwner === true);
@@ -444,6 +469,7 @@ export class Board implements OnInit, AfterViewInit {
         }
       },
       error: (err) => {
+        this.boardLoadError = true;
         this.notifications.error(err.error?.message || 'Could not load this board');
       }
 
@@ -943,6 +969,8 @@ export class Board implements OnInit, AfterViewInit {
       return;
     }
 
+    this.isSaving = true;
+    this.saveStatus = 'Saving…';
     const canvasData =
       this.canvas.nativeElement.toDataURL(
         'image/png'
@@ -962,11 +990,14 @@ export class Board implements OnInit, AfterViewInit {
       .subscribe({
 
         next: (res) => {
+          this.isSaving = false;
+          this.saveStatus = 'Saved just now';
           this.notifications.success('Board saved successfully');
         },
 
         error: (err) => {
-
+          this.isSaving = false;
+          this.saveStatus = 'Save failed';
           this.notifications.error(err.error?.message || 'Could not save board');
         }
 
@@ -1029,21 +1060,40 @@ export class Board implements OnInit, AfterViewInit {
   }
 
   onDiagramGenerated(diagram: any): void {
-    console.log('Generated diagram:', diagram);
+    if (!diagram || !Array.isArray(diagram.nodes) || !diagram.nodes.length || !Array.isArray(diagram.edges)) {
+      this.notifications.error('The AI returned an invalid diagram. Please try again.');
+      this.showAiModal = false;
+      return;
+    }
+    this.pendingAiDiagram.set(diagram);
+    this.showAiModal = false;
+  }
+
+  applyAiDiagram(): void {
+    const diagram = this.pendingAiDiagram();
+    if (!diagram) {
+      return;
+    }
+
     this.drawAiDiagram(diagram);
     this.socketService.sendAiDiagram({
       boardId: this.board()?._id,
       diagram
     });
-    this.showAiModal = false;
+    this.pendingAiDiagram.set(null);
+    this.notifications.success('AI diagram added to the board');
+  }
+
+  rejectAiDiagram(): void {
+    this.pendingAiDiagram.set(null);
   }
 
   drawAiDiagram(diagram: any): void {
     const nodes = diagram.nodes;
     const edges = diagram.edges;
 
-    if (!nodes || !edges) {
-      console.error('Invalid diagram data');
+    if (!Array.isArray(nodes) || !Array.isArray(edges) || !this.ctx) {
+      this.notifications.error('Could not draw this diagram. Please try generating it again.');
       return;
     }
 
@@ -1132,8 +1182,8 @@ export class Board implements OnInit, AfterViewInit {
     const nodeHeight = Math.min(height, Math.max(54, height));
 
     const gradient = this.ctx.createLinearGradient(x, y, x + nodeWidth, y + nodeHeight);
-    gradient.addColorStop(0, '#ffffff');
-    gradient.addColorStop(1, '#f8faff');
+    gradient.addColorStop(0, '#fffdfa');
+    gradient.addColorStop(1, '#f6f1ff');
 
     this.ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
     this.ctx.shadowBlur = 10;
@@ -1148,17 +1198,17 @@ export class Board implements OnInit, AfterViewInit {
     this.ctx.shadowBlur = 0;
     this.ctx.shadowOffsetY = 0;
 
-    this.ctx.strokeStyle = '#7c3aed';
+    this.ctx.strokeStyle = '#7955d9';
     this.ctx.lineWidth = 2;
     this.ctx.stroke();
 
-    this.ctx.fillStyle = '#7c3aed';
+    this.ctx.fillStyle = '#7955d9';
     this.ctx.fillRect(x + 12, y + 12, 6, nodeHeight - 24);
 
     const wrappedLabel = this.wrapAiText(label, nodeWidth - 34, '600 13px Arial');
     const labelLines = wrappedLabel.slice(0, 2);
 
-    this.ctx.fillStyle = '#111827';
+    this.ctx.fillStyle = '#3b3440';
     this.ctx.font = '600 13px Arial';
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'middle';
@@ -1168,7 +1218,7 @@ export class Board implements OnInit, AfterViewInit {
       this.ctx.fillText(line, x + 26, lineY);
     });
 
-    this.ctx.fillStyle = '#6b7280';
+    this.ctx.fillStyle = '#817887';
     this.ctx.font = '11px Arial';
     this.ctx.textAlign = 'left';
 
@@ -1250,12 +1300,12 @@ export class Board implements OnInit, AfterViewInit {
 
     const lineGradient = this.ctx.createLinearGradient(startX, startY, endX, endY);
     lineGradient.addColorStop(0, '#9ca3af');
-    lineGradient.addColorStop(1, '#6366f1');
+    lineGradient.addColorStop(1, '#7955d9');
 
     this.ctx.strokeStyle = lineGradient;
-    this.ctx.fillStyle = '#6366f1';
+    this.ctx.fillStyle = '#7955d9';
     this.ctx.lineWidth = 2.2;
-    this.ctx.shadowColor = 'rgba(99, 102, 241, 0.18)';
+    this.ctx.shadowColor = 'rgba(121, 85, 217, 0.18)';
     this.ctx.shadowBlur = 8;
 
     // Line

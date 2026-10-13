@@ -14,19 +14,19 @@
 	align-items: center;
 	gap: 10px;
 	padding: 13px 14px;
-	border: 1px solid #dbe3ef;
-	border-left: 4px solid #2563eb;
-	border-radius: 10px;
-	background: #fff;
-	box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
-	color: #172033;
-	font: 600 13px/1.4 Arial, Helvetica, sans-serif;
+	border: 1px solid #eee8e1;
+	border-left: 4px solid #7955d9;
+	border-radius: 11px;
+	background: #fffdfa;
+	box-shadow: 0 12px 28px rgba(48, 37, 59, .14);
+	color: #413845;
+	font: 600 13px/1.45 Inter, "Avenir Next", Avenir, sans-serif;
 	animation: notification-in .2s ease-out;
 }
 
-.notification.success { border-left-color: #16a34a; }
-.notification.error { border-left-color: #dc2626; }
-.notification.info { border-left-color: #2563eb; }
+.notification.success { border-left-color: #66815f; }
+.notification.error { border-left-color: #b95e53; }
+.notification.info { border-left-color: #7955d9; }
 
 .notification-icon {
 	display: grid;
@@ -35,13 +35,13 @@
 	height: 24px;
 	flex-shrink: 0;
 	border-radius: 50%;
-	background: #eff6ff;
-	color: #2563eb;
+	background: #f1ebff;
+	color: #7955d9;
 	font-weight: 700;
 }
 
-.success .notification-icon { background: #f0fdf4; color: #16a34a; }
-.error .notification-icon { background: #fef2f2; color: #dc2626; }
+.success .notification-icon { background: #edf3e9; color: #66815f; }
+.error .notification-icon { background: #fff0ec; color: #b95e53; }
 .notification-message { flex: 1; }
 
 .notification-close {
@@ -53,7 +53,7 @@
 	cursor: pointer;
 }
 
-.notification-close:hover { color: #172033; }
+.notification-close:hover { color: #413845; }
 
 @keyframes notification-in {
 	from { opacity: 0; transform: translateY(-8px); }

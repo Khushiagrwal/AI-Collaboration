@@ -1,26 +1,26 @@
 <div class="container">
 
-  <!-- Left Side -->
   <div class="left-panel">
-    <h1>Welcome Back 👋</h1>
+    <h1>Welcome back.</h1>
     <p>
       Sign in to access your dashboard and continue collaborating with your team.
     </p>
   </div>
 
-  <!-- Right Side -->
   <div class="right-panel">
 
     <div class="login-card">
 
-      <h2>Login</h2>
-      <p>Enter your credentials</p>
+      <span class="form-kicker">YOUR CREATIVE SPACE</span>
+      <h2>Come on in.</h2>
+      <p>Sign in to find your team’s ideas in progress.</p>
 
       <form [formGroup]="loginForm" (ngSubmit)="submit()">
 
         <div class="form-group">
-          <label>Email</label>
+          <label for="login-email">Email</label>
           <input
+            id="login-email"
             type="email"
             placeholder="Enter Email"
             formControlName="email">
@@ -37,8 +37,9 @@
         </div>
 
         <div class="form-group">
-          <label>Password</label>
+          <label for="login-password">Password</label>
           <input
+            id="login-password"
             type="password"
             placeholder="Enter Password"
             formControlName="password">

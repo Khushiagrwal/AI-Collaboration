@@ -1,69 +1,43 @@
 <div class="ai-modal-overlay">
+  <section class="ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-title">
+    <header class="ai-modal-header">
+      <div class="ai-title">
+        <span class="ai-icon" aria-hidden="true">✦</span>
+        <div>
+          <span class="modal-kicker">ATELIER · AI STUDIO</span>
+          <h2 id="ai-title">Give your idea a shape.</h2>
+          <p>Describe a system, process, or brainstorm to create an editable first draft.</p>
+        </div>
+      </div>
+      <button type="button" class="close-btn" aria-label="Close AI studio" (click)="closeModal()">×</button>
+    </header>
 
-  <div class="ai-modal">
-
-```
-<!-- Header -->
-<div class="ai-modal-header">
-
-  <div class="ai-title">
-    <div class="ai-icon">🤖</div>
-
-    <div>
-      <h2>WhiteBoard AI</h2>
-      <p>Create diagrams using natural language</p>
+    <div class="ai-modal-body">
+      <label for="aiPrompt">What would you like to map?</label>
+      <textarea
+        id="aiPrompt"
+        [(ngModel)]="aiPrompt"
+        placeholder="For example: Map the steps from a customer discovering our product to becoming a loyal advocate."
+        [disabled]="aiLoading"
+      ></textarea>
+      <p class="prompt-hint"><span aria-hidden="true">✧</span> A few specifics about people, steps, or connections make a richer starting point.</p>
+      <p class="ai-error" *ngIf="aiError" role="alert">{{ aiError }}</p>
     </div>
-  </div>
 
-  <button type="button" class="close-btn" (click)="closeModal()">
-    ✕
-  </button>
-
-</div>
-
-
-<!-- Body -->
-<div class="ai-modal-body">
-
-  <label for="aiPrompt">What do you want to create?</label>
-
-  <textarea
-    id="aiPrompt"  [(ngModel)]="aiPrompt"
-    placeholder="Describe your diagram...
-
-Example:
-Create a login system with Angular frontend,
-Node.js backend and MongoDB database."
-></textarea>
-
-  <div class="prompt-hint">
-    💡 Be specific about the components and their relationships.
-  </div>
-
-</div>
-
-
-<!-- Footer -->
-<div class="ai-modal-footer">
-
-  <button class="cancel-btn">
-    Cancel
-  </button>
-
- 
-  <button class="generate-btn"
-  (click)="generateDiagram()"
-  [disabled]="!aiPrompt.trim() || aiLoading">
-
-  @if (aiLoading) {
-    Generating...
-  } @else {
-    ✨ Generate Diagram
-  }
-
-</button>
-
-</div>
-  </div>
-
+    <footer class="ai-modal-footer">
+      <p><span aria-hidden="true">◇</span> Suggestions are drafts. You’ll review before applying.</p>
+      <div class="modal-actions">
+        <button type="button" class="cancel-btn" (click)="closeModal()">Cancel</button>
+        <button
+          type="button"
+          class="generate-btn"
+          (click)="generateDiagram()"
+          [disabled]="!aiPrompt.trim() || aiLoading"
+        >
+          <span aria-hidden="true">{{ aiLoading ? '◌' : '✧' }}</span>
+          {{ aiLoading ? 'Sketching…' : 'Generate draft' }}
+        </button>
+      </div>
+    </footer>
+  </section>
 </div>

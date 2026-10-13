@@ -1,26 +1,35 @@
 <div class="app">
 
-  <!-- Top Navbar -->
   <header class="navbar">
+    <a class="logo" routerLink="/dashboard" aria-label="Back to your studio">
+      <span class="back-arrow" aria-hidden="true">←</span>
+      <span class="logo-mark" aria-hidden="true">a.</span>
+      <span class="brand-name">atelier</span>
+    </a>
 
-    <div class="logo">
-      🚀 WhiteBoard AI
-    </div>
-
-    <div class="board-name">
-      {{board()?.title }}
+    <div class="board-heading">
+      <span class="board-breadcrumb">YOUR STUDIO <span aria-hidden="true">/</span></span>
+      <h1 class="board-name">{{ boardLoadError ? 'Board unavailable' : board()?.title || 'Loading your board…' }}</h1>
     </div>
 
     <div class="nav-actions">
+      <div class="collaborator-stack" *ngIf="collaborators.length" aria-label="Board collaborators">
+        <span class="avatar" *ngFor="let user of collaborators; let i = index" [class.avatar-peach]="i % 3 === 1" [class.avatar-sage]="i % 3 === 2" [attr.title]="user.name">
+          {{ user.name?.charAt(0)?.toUpperCase() || '?' }}
+        </span>
+        <span class="collaborator-total">{{ collaborators.length }}</span>
+      </div>
 
       @if (isOwner()) {
-      <button (click)="saveBoard()">💾 Save</button>
+      <button class="save-button" type="button" (click)="saveBoard()" [disabled]="isSaving">
+        <span aria-hidden="true">{{ isSaving ? '◌' : '↧' }}</span> {{ isSaving ? 'Saving' : 'Save' }}
+      </button>
 
-      <button (click)="showShareModal = true">👥 Share</button>
+      <button class="share-button" type="button" (click)="showShareModal = true"><span aria-hidden="true">↗</span> Share</button>
       }
 
       @if (!isOwner()) {
-      <span class="access-label">Shared with you</span>
+      <span class="access-label"><span aria-hidden="true">↗</span> Shared with you</span>
       }
 
       @if (isOwner() && showShareModal) {
@@ -168,22 +177,8 @@
 
       }
 
-      <div class="user-info">
-
-        <div class="user-avatar">
-          {{ currentUser()?.name?.charAt(0) }}
-        </div>
-
-        <div class="user-details">
-          <div class="user-name">
-            {{ currentUser()?.name }}
-          </div>
-
-          <div class="user-email">
-            {{ currentUser()?.email }}
-          </div>
-        </div>
-
+      <div class="user-info" [attr.title]="currentUser()?.email">
+        <div class="user-avatar">{{ currentUser()?.name?.charAt(0)?.toUpperCase() || '?' }}</div>
       </div>
 
     </div>
@@ -191,19 +186,19 @@
   </header>
 
 
-  <!-- Main -->
   <div class="main">
+    <div class="board-error-state" *ngIf="boardLoadError" role="alert">
+      <strong>This board couldn’t be opened.</strong>
+      <span>It may have moved, or you may no longer have access.</span>
+      <a routerLink="/dashboard">Return to your studio</a>
+    </div>
 
-    <!-- Left Toolbar -->
-    <aside class="toolbar">
-
-      <button [class.active]="activeTool === 'select'" (click)="activeTool = 'select'">🖱️</button>
-
-      <!-- <button [class.active]="activeTool === 'hand'" (click)="activeTool = 'hand'">✋</button> -->
-
-      <button class="pen-tool" [class.active]="activeTool === 'pen'" title="Pencil color: click to change"
+    <aside class="toolbar" aria-label="Drawing tools">
+      <span class="toolbar-label">TOOLS</span>
+      <button type="button" class="tool-button" [class.active]="activeTool === 'select'" title="Select and move" aria-label="Select and move" (click)="activeTool = 'select'"><span aria-hidden="true">↖</span></button>
+      <button type="button" class="tool-button pen-tool" [class.active]="activeTool === 'pen'" title="Pencil color: click to change"
         aria-label="Pencil tool. Click again to change color" (click)="activeTool = 'pen'; toggleColorPicker()">
-        🖊️
+        <span aria-hidden="true">✎</span>
         <span class="tool-color-indicator" [style.backgroundColor]="color"></span>
       </button>
 
@@ -222,23 +217,18 @@
       </div>
       }
 
-      <button [class.active]="activeTool === 'eraser'" (click)="activeTool = 'eraser'">⬜</button>
-
-      <button [class.active]="activeTool === 'circle'" (click)="activeTool = 'circle'">⭕</button>
-
-      <button [class.active]="activeTool === 'line'" (click)="activeTool = 'line'">📏</button>
-
-      <button [class.active]="activeTool === 'text'" (click)="activeTool = 'text'">T</button>
-
-      <button (click)="clearCanvas()">🗑️</button>
+      <button type="button" class="tool-button" [class.active]="activeTool === 'eraser'" title="Eraser" aria-label="Eraser" (click)="activeTool = 'eraser'"><span aria-hidden="true">⌫</span></button>
+      <button type="button" class="tool-button" [class.active]="activeTool === 'circle'" title="Ellipse" aria-label="Ellipse tool" (click)="activeTool = 'circle'"><span aria-hidden="true">○</span></button>
+      <button type="button" class="tool-button" [class.active]="activeTool === 'line'" title="Line" aria-label="Line tool" (click)="activeTool = 'line'"><span aria-hidden="true">／</span></button>
+      <button type="button" class="tool-button text-tool" [class.active]="activeTool === 'text'" title="Text" aria-label="Text tool" (click)="activeTool = 'text'"><span aria-hidden="true">T</span></button>
+      <span class="toolbar-divider" aria-hidden="true"></span>
+      <button type="button" class="tool-button clear-tool" title="Clear canvas" aria-label="Clear canvas" (click)="clearCanvas()"><span aria-hidden="true">⌫</span></button>
 
     </aside>
 
 
-    <!-- Canvas -->
     <section class="canvas-wrapper">
-
-      <canvas #boardCanvas (mousedown)="startDrawing($event)" (mousemove)="draw($event); trackCursor($event)"
+      <canvas #boardCanvas aria-label="Collaborative whiteboard canvas" (mousedown)="startDrawing($event)" (mousemove)="draw($event); trackCursor($event)"
         (mouseup)="stopDrawing()" (mouseleave)="stopDrawing(); stopTrackingCursor()">
       </canvas>
       @if (isTyping) {
@@ -246,11 +236,6 @@
         placeholder="Type your text" aria-label="Enter board text" [(ngModel)]="currentText"
         (keydown.enter)="finishText()" (keydown.escape)="cancelText()" autofocus />
       }
-
-      <div class="users">
-        <div class="avatar">K</div>
-        <div class="avatar">R</div>
-      </div>
 
       <div class="cursor-layer">
         @for (cursor of remoteCursorEntries; track cursor[0]) {
@@ -273,12 +258,48 @@
     </section>
 
 
-    <!-- Right Panel -->
-    <aside class="right-panel">
+    <aside class="right-panel" aria-label="AI Copilot">
+      <div class="copilot-heading">
+        <span class="copilot-icon" aria-hidden="true">✦</span>
+        <div>
+          <span class="copilot-overline">YOUR CREATIVE PARTNER</span>
+          <h2>AI Copilot</h2>
+        </div>
+      </div>
+      <p class="copilot-intro">Turn a thought into a clear, editable diagram.</p>
+      <button class="copilot-generate" type="button" (click)="showAiModal = true"><span aria-hidden="true">✧</span> Generate a diagram</button>
 
-      <button type="button" (click)="showAiModal = true">
-        🤖 AI
-      </button>
+      <div class="copilot-empty" *ngIf="!pendingAiDiagram()">
+        <span class="copilot-orbit" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong>Start with a thought</strong>
+        <p>Describe a process, product, or system and let AI sketch a first pass.</p>
+      </div>
+
+      <section class="proposal-card" *ngIf="pendingAiDiagram()" aria-labelledby="proposal-title">
+        <div class="proposal-label"><span aria-hidden="true">✦</span> NEW PROPOSAL</div>
+        <h3 id="proposal-title">A starting point for your board</h3>
+        <p class="proposal-summary">{{ pendingAiDiagram().nodes.length }} nodes <span aria-hidden="true">·</span> {{ pendingAiDiagram().edges.length }} connections</p>
+        <div class="proposal-nodes">
+          <div class="proposal-node" *ngFor="let node of pendingDiagramNodes; let i = index">
+            <span class="proposal-node-dot" [class.dot-peach]="i % 3 === 1" [class.dot-sage]="i % 3 === 2"></span>
+            <span>{{ node.label }}</span>
+          </div>
+          <span class="proposal-more" *ngIf="pendingAiDiagram().nodes.length > pendingDiagramNodes.length">+{{ pendingAiDiagram().nodes.length - pendingDiagramNodes.length }} more nodes</span>
+        </div>
+        <div class="evidence-note warning-note">
+          <span aria-hidden="true">!</span>
+          <p><strong>AI-generated · not verified</strong><br>No evidence or citations were returned. Review before applying.</p>
+        </div>
+        <div class="proposal-actions">
+          <button class="reject-button" type="button" (click)="rejectAiDiagram()">Reject</button>
+          <button class="apply-button" type="button" (click)="applyAiDiagram()">Apply to board</button>
+        </div>
+      </section>
+
+      <div class="copilot-footnote" *ngIf="!pendingAiDiagram()">
+        <span aria-hidden="true">◇</span>
+        <p>Every generated diagram is a draft. Review it before adding it to your shared canvas.</p>
+      </div>
 
       @if (showAiModal) {
       <app-ai-panal-modal (close)="showAiModal = false"
@@ -290,15 +311,10 @@
   </div>
 
 
-  <!-- Footer -->
   <footer class="footer">
-
-    <span>100%</span>
-
-    <span>Ready ●</span>
-
-    <span>Mouse : (0,0)</span>
-
+    <span class="save-indicator"><i [class.saving]="isSaving"></i> {{ isOwner() ? saveStatus : 'Shared board' }}</span>
+    <span>Board canvas</span>
+    <span>100% <span aria-hidden="true">⌕</span></span>
   </footer>
 
 </div>

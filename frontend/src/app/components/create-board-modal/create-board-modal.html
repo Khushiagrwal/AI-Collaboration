@@ -1,29 +1,18 @@
-<div class="overlay">
-
-  <div class="modal">
-
-    <h2>Create Board</h2>
-
-    <p>Give your whiteboard a meaningful name.</p>
-
-    <input
-      type="text"
-      placeholder="Board Title"
-      [(ngModel)]="title"
-    >
-
-    <div class="buttons">
-
-      <button class="cancel" (click)="closeModal()">
-        Cancel
-      </button>
-
-      <button class="create" (click)="createBoard()">
-        Create Board
-      </button>
-
-    </div>
-
+  <div class="overlay">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="create-board-title">
+      <h2 id="create-board-title">Make room for an idea.</h2>
+      <p>Give your new whiteboard a name you’ll remember.</p>
+      <input
+        type="text"
+        placeholder="e.g. Spring launch journey"
+        aria-label="Board title"
+        [(ngModel)]="title"
+        (keydown.enter)="createBoard()"
+        autofocus
+      >
+      <div class="buttons">
+        <button class="cancel" type="button" (click)="closeModal()">Not now</button>
+        <button class="create" type="button" (click)="createBoard()">Create board</button>
+      </div>
+    </section>
   </div>
-
-</div>

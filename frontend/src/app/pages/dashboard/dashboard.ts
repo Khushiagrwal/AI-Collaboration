@@ -3,13 +3,14 @@ import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../services/authService/auth';
 import { CreateBoardModal } from '../../components/create-board-modal/create-board-modal';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { BoardService } from '../../services/boardService/boardService';
 import { NotificationService } from '../../services/notification.service';
 
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink,CreateBoardModal,CommonModule],
+  imports: [RouterLink, CreateBoardModal, CommonModule, FormsModule],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
 })
@@ -29,6 +30,10 @@ export class Dashboard {
   activeTab: string = 'dashboard';
   boards:any[]=[]
   currentUser: any = null;
+  searchQuery = '';
+  boardFilter: 'all' | 'owned' | 'shared' = 'all';
+  isLoading = false;
+  loadError = false;
 
   get ownedBoards() {
     return this.boards.filter(board => board.isOwner);
@@ -38,13 +43,31 @@ export class Dashboard {
     return this.boards.filter(board => !board.isOwner);
   }
 
+  get filteredBoards() {
+    const query = this.searchQuery.trim().toLocaleLowerCase();
+    return this.boards
+      .filter(board => {
+        if (this.boardFilter === 'owned') return board.isOwner;
+        if (this.boardFilter === 'shared') return !board.isOwner;
+        return true;
+      })
+      .filter(board => !query || String(board.title ?? '').toLocaleLowerCase().includes(query))
+      .sort((first, second) =>
+        new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime()
+      );
+  }
+
   loadBoards(){
+    this.isLoading = true;
+    this.loadError = false;
     this.boardService.getBoards().subscribe({
       next:(res:any)=>{
         this.boards=res.boards ?? [];
         this.currentUser = res.currentUser ?? null;
-        console.log("Successfully loads",res.boards)
+        this.isLoading = false;
       },error:(err:any)=>{
+        this.isLoading = false;
+        this.loadError = true;
         this.notifications.error(err.error?.message || err.message || 'Could not load boards');
       }
     })
@@ -71,19 +94,8 @@ export class Dashboard {
     })
   }
 
-  get totalMembers() {
-    const memberIds = this.boards.flatMap(board => [
-      board.owner?._id,
-      ...(board.participants ?? []).map((participant: any) => participant._id)
-    ]);
-    return new Set(memberIds.filter(Boolean).map(String)).size;
-  }
-
   get recentBoards() {
-    return [...this.boards]
-      .sort((first, second) =>
-        new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime()
-      )
+    return this.filteredBoards
       .slice(0, 4);
   }
 
@@ -96,18 +108,6 @@ export class Dashboard {
 
   openBoard(id:string) {
     this.router.navigate(['/board',id]);
-  }
-
-  inviteTeam() {
-    console.log('Invite Team');
-  }
-
-  videoMeeting() {
-    console.log('Video Meeting');
-  }
-
-  shareWorkspace() {
-    console.log('Share Workspace');
   }
 
 }

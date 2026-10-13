@@ -1,259 +1,223 @@
-<div class="dashboard">
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Workspace navigation">
+    <a class="brand" routerLink="/dashboard" aria-label="Studio home">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span>atelier<span class="brand-dot">.</span></span>
+    </a>
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
+    <div class="workspace-label">WORKSPACE</div>
+    <nav class="primary-nav" aria-label="Main navigation">
+      <button type="button" [class.active]="activeTab === 'dashboard'" [attr.aria-current]="activeTab === 'dashboard' ? 'page' : null" (click)="activeTab = 'dashboard'">
+        <span class="nav-icon" aria-hidden="true">⌂</span> Overview
+      </button>
+      <button type="button" [class.active]="activeTab === 'boards'" [attr.aria-current]="activeTab === 'boards' ? 'page' : null" (click)="activeTab = 'boards'">
+        <span class="nav-icon" aria-hidden="true">▦</span> All boards
+        <span class="nav-count">{{ boards.length }}</span>
+      </button>
+    </nav>
 
-    <h2 class="logo">🚀 WhiteBoard AI</h2>
+    <div class="sidebar-note">
+      <span class="note-spark" aria-hidden="true">✦</span>
+      <p>A little space to think out loud.</p>
+      <span>Made for your next big idea</span>
+    </div>
 
-    <nav>
-
-  <a
-    [class.active]="activeTab==='dashboard'"
-    (click)="activeTab='dashboard'">
-    🏠 Dashboard
-  </a>
-
-  <a
-    [class.active]="activeTab==='boards'"
-    (click)="activeTab='boards'">
-    📋 Boards
-  </a>
-
-  <a
-    [class.active]="activeTab==='team'"
-    (click)="activeTab='team'">
-    👥 Team
-  </a>
-
-  <a
-    [class.active]="activeTab==='chat'"
-    (click)="activeTab='chat'">
-    💬 Chat
-  </a>
-
-  <a
-    [class.active]="activeTab==='analytics'"
-    (click)="activeTab='analytics'">
-    📊 Analytics
-  </a>
-
-  <a
-    [class.active]="activeTab==='settings'"
-    (click)="activeTab='settings'">
-    ⚙️ Settings
-  </a>
-
-</nav>
-
-    <button class="logout" (click)="logout()">
-      Logout
+    <button class="account-button" type="button" (click)="logout()">
+      <span class="account-avatar">{{ currentUser?.name?.charAt(0) || '?' }}</span>
+      <span class="account-copy">
+        <strong>{{ currentUser?.name || 'Your account' }}</strong>
+        <span>Sign out</span>
+      </span>
+      <span class="account-arrow" aria-hidden="true">↗</span>
     </button>
-
   </aside>
 
-  <!-- Main -->
-  <main class="main">
-<div *ngIf="activeTab==='dashboard'">
-    <!-- Header -->
-    <div class="header">
+  <main class="main-content">
+    <header class="topbar">
+      <div class="breadcrumb"><span>Studio</span><span aria-hidden="true">/</span><strong>{{ activeTab === 'boards' ? 'All boards' : 'Overview' }}</strong></div>
+      <label class="search-box">
+        <span aria-hidden="true">⌕</span>
+        <input type="search" aria-label="Search boards" placeholder="Find a board…" [(ngModel)]="searchQuery">
+        <kbd>/</kbd>
+      </label>
+      <span class="top-avatar" role="img" [attr.aria-label]="'Signed in as ' + (currentUser?.name || 'you')">
+        {{ currentUser?.name?.charAt(0) || '?' }}
+      </span>
+    </header>
 
-      <div>
-        <h1>Welcome back, {{ currentUser?.name || 'there' }} 👋</h1>
-        <p>Here is the latest overview of your collaborative workspace.</p>
-      </div>
-
-      <div class="profile">
-        <div class="profile-avatar">
-          {{ currentUser?.name?.charAt(0) || '?' }}
+    <section class="page-content" *ngIf="activeTab === 'dashboard'">
+      <div class="welcome-row">
+        <div>
+          <p class="eyebrow">YOUR CREATIVE SPACE <span aria-hidden="true">✦</span></p>
+          <h1>A good idea deserves<br class="desktop-break"> <em>a place to grow.</em></h1>
+          <p class="welcome-copy">Welcome back, {{ currentUser?.name || 'there' }}. Pick up where your curiosity left off.</p>
         </div>
+        <button class="create-button" type="button" (click)="showCreateModal = true">
+          <span aria-hidden="true">＋</span> Create a board
+        </button>
       </div>
 
-    </div>
-
-    <!-- Cards -->
-
-    <div class="cards">
-
-      <div class="card purple">
-        <h3>Total Boards</h3>
-        <h2>{{ownedBoards.length}}</h2>
-        <span>Created by you</span>
+      <div class="board-section-heading">
+        <div>
+          <span class="section-kicker">PICK UP WHERE YOU LEFT OFF</span>
+          <h2>Recently in your studio</h2>
+        </div>
+        <button class="text-link" type="button" (click)="activeTab = 'boards'">Explore all boards <span aria-hidden="true">↗</span></button>
       </div>
 
-      <div class="card blue">
-        <h3>Members</h3>
-        <h2>{{totalMembers}}</h2>
-        <span>Across your boards</span>
+      <div class="loading-state" *ngIf="isLoading" role="status">
+        <span class="loading-dot"></span> Gathering your boards…
+      </div>
+      <div class="error-state" *ngIf="loadError">
+        <div><strong>We couldn’t load your boards.</strong><span>Check your connection and try again.</span></div>
+        <button type="button" (click)="loadBoards()">Try again</button>
       </div>
 
-      <div class="card orange">
-        <h3>Messages</h3>
-        <h2>{{sharedBoards.length}}</h2>
-        <span>Shared with you</span>
+      <div class="board-grid" *ngIf="!isLoading && !loadError && recentBoards.length">
+        <article class="board-card" *ngFor="let board of recentBoards; let i = index">
+          <button class="board-open" type="button" (click)="openBoard(board._id)" [attr.aria-label]="'Open board ' + board.title">
+            <div class="board-art" [ngClass]="'art-' + (i % 4)" aria-hidden="true">
+              <span class="art-paper"></span>
+              <span class="art-node art-node-a"></span>
+              <span class="art-node art-node-b"></span>
+              <span class="art-node art-node-c"></span>
+              <span class="art-node art-node-d"></span>
+              <span class="art-line art-line-a"></span>
+              <span class="art-line art-line-b"></span>
+              <span class="art-line art-line-c"></span>
+              <span class="art-note"></span>
+              <span class="art-tag">{{ i % 4 === 0 ? 'MAPPING' : i % 4 === 1 ? 'IDEATION' : i % 4 === 2 ? 'SYSTEMS' : 'STORYBOARD' }}</span>
+            </div>
+            <div class="board-card-copy">
+              <div class="board-title-row">
+                <h3>{{ board.title }}</h3>
+                <span class="card-menu" aria-hidden="true">···</span>
+              </div>
+              <p class="board-updated">Edited {{ board.updatedAt | date:'mediumDate' }}</p>
+              <div class="board-meta">
+                <span class="board-access" [class.shared-access]="!board.isOwner">
+                  <span aria-hidden="true">{{ board.isOwner ? '✦' : '↗' }}</span>
+                  {{ board.isOwner ? 'Your board' : 'Shared by ' + (board.owner?.name || 'a teammate') }}
+                </span>
+                <span class="avatar-stack" *ngIf="board.owner || board.participants?.length" [attr.aria-label]="(board.participants?.length || 0) + 1 + ' collaborators'">
+                  <span class="mini-avatar owner-avatar">{{ board.owner?.name?.charAt(0) || currentUser?.name?.charAt(0) || '?' }}</span>
+                  <span class="mini-avatar collaborator-avatar" *ngIf="board.participants?.length">{{ board.participants[0]?.name?.charAt(0) || '?' }}</span>
+                  <span class="collaborator-count" *ngIf="(board.participants?.length || 0) > 1">+{{ board.participants.length - 1 }}</span>
+                </span>
+              </div>
+            </div>
+          </button>
+        </article>
       </div>
 
-      <div class="card green">
-        <h3>Meetings</h3>
-        <h2>{{boards.length}}</h2>
-        <span>Total accessible</span>
+      <div class="empty-state" *ngIf="!isLoading && !loadError && !recentBoards.length">
+        <span class="empty-art" aria-hidden="true">✳</span>
+        <h3>{{ searchQuery ? 'No boards found' : 'Your canvas is wide open.' }}</h3>
+        <p>{{ searchQuery ? 'Try another title or clear your search.' : 'Create a board to collect your first ideas, maps, and moments of clarity.' }}</p>
+        <button type="button" class="create-button" *ngIf="!searchQuery" (click)="showCreateModal = true">＋ Create your first board</button>
       </div>
 
-    </div>
-
-    <!-- Bottom Section -->
-
-    <div class="bottom">
-
-      <!-- Recent Activity -->
-
-      <div class="activity">
-
-        <h2>Recent board activity</h2>
-
-        <div class="item" *ngFor="let board of recentBoards">
-
-          <span>{{board.isOwner ? '🎨' : '🤝'}}</span>
-
-          <div>
-
-            <b>{{board.title}}</b>
-
-            <p>{{board.isOwner ? 'Created by you' : 'Shared by ' + (board.owner?.name || 'a teammate')}}</p>
-
+      <section class="studio-lower" aria-label="Workspace collections and AI">
+        <article class="lower-card collections-card">
+          <div class="lower-card-heading">
+            <div>
+              <span class="section-kicker">GATHERED THOUGHTS</span>
+              <h2>Collections</h2>
+            </div>
+            <span class="lower-icon lilac-icon" aria-hidden="true">▤</span>
           </div>
-
-          <button class="activity-open" (click)="openBoard(board._id)">Open</button>
-
-        </div>
-
-        <p class="no-activity" *ngIf="!recentBoards.length">No board activity yet.</p>
-
-      </div>
-
-      <!-- Quick Actions -->
-
-      <div class="actions">
-
-        <h2>Quick Actions</h2>
-
-        <button (click)="showCreateModal=true">Create Board</button>
-
-        <button (click)="inviteTeam()">Invite Team</button>
-
-        <button (click)="videoMeeting()">Video Meeting</button>
-
-        <button (click)="shareWorkspace()">Share Workspace</button>
-
-      </div>
-
-    </div>
-    <!-- Boards Section -->
-</div>
-<div *ngIf="activeTab==='boards'">
-
-  <div class="boards-header">
-
-    <h2>📋 Your Boards</h2>
-
-    <button class="new-board-btn"
-            (click)="showCreateModal = true">
-      + New Board
-    </button>
-
-  </div>
-
-  <section class="board-group" *ngIf="ownedBoards.length">
-    <div class="group-heading">
-      <div>
-        <span class="group-kicker">YOUR WORKSPACE</span>
-        <h3>Boards you created</h3>
-      </div>
-      <span class="group-count">{{ ownedBoards.length }} boards</span>
-    </div>
-
-    <div class="boards-grid">
-      <div class="board-card owned-board" *ngFor="let board of ownedBoards">
-
-      <div class="board-icon">
-        📄
-      </div>
-
-      <h3>{{ board.title }}</h3>
-
-      <span class="access-badge owner-badge">Owner</span>
-
-      <p>
-        Last Updated:
-        {{ board.updatedAt | date:'mediumDate' }}
-      </p>
-
-      <div class="board-footer">
-
-        <span>
-          👥 {{ board.participants.length }} Members
-        </span>
-
-        <div class="board-actions">
-
-          <button class="open-btn" (click)="openBoard(board._id)">
-            Open
-          </button>
-
-          <button class="edit-btn">
-            Edit
-          </button>
-
-          <button class="delete-btn" (click)="deleteBoard(board._id)">
-            Delete
-          </button>
-
-        </div>
-
-      </div>
-
-    </div>
-    </div>
-  </section>
-
-  <section class="board-group shared-group" *ngIf="sharedBoards.length">
-    <div class="group-heading">
-      <div>
-        <span class="group-kicker">COLLABORATION</span>
-        <h3>Boards shared with you</h3>
-      </div>
-      <span class="group-count">{{ sharedBoards.length }} boards</span>
-    </div>
-
-    <div class="boards-grid">
-      <div class="board-card shared-board" *ngFor="let board of sharedBoards">
-        <div class="board-icon shared-icon">🤝</div>
-        <h3>{{ board.title }}</h3>
-        <span class="access-badge shared-badge">Shared by {{ board.owner?.name || 'a teammate' }}</span>
-        <p>Last Updated: {{ board.updatedAt | date:'mediumDate' }}</p>
-        <div class="board-footer">
-          <span>👥 {{ board.participants?.length || 0 }} Members</span>
-          <div class="board-actions">
-            <button class="open-btn" (click)="openBoard(board._id)">Open</button>
+          <div class="lower-empty">
+            <span class="collection-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div>
+              <strong>No collections yet</strong>
+              <p>Your boards are ready to become a library of ideas. Collections aren’t available in this workspace yet.</p>
+            </div>
           </div>
+        </article>
+
+        <article class="lower-card insights-card">
+          <div class="lower-card-heading">
+            <div>
+              <span class="section-kicker">A SECOND SET OF EYES</span>
+              <h2>Recent AI insights</h2>
+            </div>
+            <span class="lower-icon peach-icon" aria-hidden="true">✦</span>
+          </div>
+          <div class="insight-empty">
+            <span class="insight-orbit" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div>
+              <strong>No saved insights just yet</strong>
+              <p>AI can help shape a diagram inside any board. Generated suggestions aren’t stored as insights here.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
+
+    <section class="page-content boards-page" *ngIf="activeTab === 'boards'">
+      <div class="boards-page-heading">
+        <div>
+          <p class="eyebrow">THE WHOLE PICTURE</p>
+          <h1>Your boards, <em>all together.</em></h1>
+          <p class="welcome-copy">Every map, brainstorm, and shared thought in one place.</p>
         </div>
+        <button class="create-button" type="button" (click)="showCreateModal = true"><span aria-hidden="true">＋</span> New board</button>
       </div>
-    </div>
-  </section>
 
-  <div class="empty-boards" *ngIf="!boards.length">
-    <strong>No boards yet</strong>
-    <p>Create your first board to start collaborating.</p>
-  </div>
+      <div class="board-filters" aria-label="Filter boards">
+        <button type="button" [class.selected]="boardFilter === 'all'" (click)="boardFilter = 'all'">All <span>{{ boards.length }}</span></button>
+        <button type="button" [class.selected]="boardFilter === 'owned'" (click)="boardFilter = 'owned'">Created by me <span>{{ ownedBoards.length }}</span></button>
+        <button type="button" [class.selected]="boardFilter === 'shared'" (click)="boardFilter = 'shared'">Shared with me <span>{{ sharedBoards.length }}</span></button>
+      </div>
 
-</div>
+      <div class="loading-state" *ngIf="isLoading" role="status"><span class="loading-dot"></span> Gathering your boards…</div>
+      <div class="error-state" *ngIf="loadError">
+        <div><strong>We couldn’t load your boards.</strong><span>Check your connection and try again.</span></div>
+        <button type="button" (click)="loadBoards()">Try again</button>
+      </div>
 
+      <div class="board-grid all-boards-grid" *ngIf="!isLoading && !loadError && filteredBoards.length">
+        <article class="board-card" *ngFor="let board of filteredBoards; let i = index">
+          <div class="board-card-menu">
+            <button class="open-card-button" type="button" (click)="openBoard(board._id)" [attr.aria-label]="'Open board ' + board.title">
+              <div class="board-art" [ngClass]="'art-' + (i % 4)" aria-hidden="true">
+                <span class="art-paper"></span>
+                <span class="art-node art-node-a"></span>
+                <span class="art-node art-node-b"></span>
+                <span class="art-node art-node-c"></span>
+                <span class="art-node art-node-d"></span>
+                <span class="art-line art-line-a"></span>
+                <span class="art-line art-line-b"></span>
+                <span class="art-line art-line-c"></span>
+                <span class="art-note"></span>
+                <span class="art-tag">{{ i % 4 === 0 ? 'MAPPING' : i % 4 === 1 ? 'IDEATION' : i % 4 === 2 ? 'SYSTEMS' : 'STORYBOARD' }}</span>
+              </div>
+            </button>
+            <button class="more-button" type="button" *ngIf="board.isOwner" (click)="deleteBoard(board._id)" [attr.aria-label]="'Delete ' + board.title">×</button>
+          </div>
+          <div class="board-card-copy">
+            <div class="board-title-row"><h3>{{ board.title }}</h3><span class="access-pill" [class.shared-pill]="!board.isOwner">{{ board.isOwner ? 'Owner' : 'Shared' }}</span></div>
+            <p class="board-updated">Edited {{ board.updatedAt | date:'mediumDate' }}<span> · </span>{{ board.participants?.length || 0 }} {{ (board.participants?.length || 0) === 1 ? 'collaborator' : 'collaborators' }}</p>
+            <div class="board-meta">
+              <span class="board-access" [class.shared-access]="!board.isOwner">{{ board.isOwner ? 'Created by you' : 'Shared by ' + (board.owner?.name || 'a teammate') }}</span>
+              <span class="avatar-stack" *ngIf="board.owner || board.participants?.length">
+                <span class="mini-avatar owner-avatar">{{ board.owner?.name?.charAt(0) || currentUser?.name?.charAt(0) || '?' }}</span>
+                <span class="mini-avatar collaborator-avatar" *ngIf="board.participants?.length">{{ board.participants[0]?.name?.charAt(0) || '?' }}</span>
+              </span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="empty-state" *ngIf="!isLoading && !loadError && !filteredBoards.length">
+        <span class="empty-art" aria-hidden="true">✳</span>
+        <h3>{{ searchQuery ? 'No boards match your search.' : 'Nothing on this shelf yet.' }}</h3>
+        <p>{{ searchQuery ? 'Try a different title or adjust your filters.' : 'Create a board or switch to another filter to find your work.' }}</p>
+        <button type="button" class="create-button" *ngIf="!searchQuery && boardFilter !== 'all'" (click)="boardFilter = 'all'">Show all boards</button>
+        <button type="button" class="create-button" *ngIf="!searchQuery && boardFilter === 'all'" (click)="showCreateModal = true">＋ Create a board</button>
+      </div>
+    </section>
   </main>
-
 </div>
 
-<app-create-board-modal
-    *ngIf="showCreateModal"
-    (close)="showCreateModal=false"
-  (boardCreated)="onBoardCreated($event)">
-    
-</app-create-board-modal>
+<app-create-board-modal *ngIf="showCreateModal" (close)="showCreateModal = false" (boardCreated)="onBoardCreated($event)"></app-create-board-modal>

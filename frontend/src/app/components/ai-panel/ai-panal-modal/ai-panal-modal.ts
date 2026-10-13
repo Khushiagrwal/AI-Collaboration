@@ -1,11 +1,12 @@
 import { Component, EventEmitter, inject, Output } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Ai } from '../../../services/aiService/ai';
 
 @Component({
   selector: 'app-ai-panal-modal',
   standalone: true,
-  imports: [FormsModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './ai-panal-modal.html',
   styleUrl: './ai-panal-modal.css',
 })

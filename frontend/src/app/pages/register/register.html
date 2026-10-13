@@ -1,12 +1,10 @@
 <div class="container">
 
-  <!-- Left Side -->
   <div class="left-panel">
-    <h1>Create Your Account 🚀</h1>
+    <h1>A place for<br>good ideas.</h1>
 
     <p>
-      Join our AI Collaborative Whiteboard platform and collaborate with your
-      team in real-time.
+      Make space for the ideas, maps, and moments of clarity you’ll build together.
     </p>
 
     <ul>
@@ -16,20 +14,21 @@
     </ul>
   </div>
 
-  <!-- Right Side -->
   <div class="right-panel">
 
     <div class="register-card">
 
-      <h2>Create Account</h2>
-      <p>Fill your details below</p>
+      <span class="form-kicker">START SOMETHING GOOD</span>
+      <h2>Make yourself at home.</h2>
+      <p>Create an account to open your studio.</p>
 
       <form [formGroup]="registerForm" (ngSubmit)="register()">
 
         <!-- Name -->
         <div class="form-group">
-          <label>Full Name</label>
+          <label for="register-name">Full name</label>
           <input
+            id="register-name"
             type="text"
             placeholder="Enter Full Name"
             formControlName="name">
@@ -42,8 +41,9 @@
 
         <!-- Email -->
         <div class="form-group">
-          <label>Email</label>
+          <label for="register-email">Email</label>
           <input
+            id="register-email"
             type="email"
             placeholder="Enter Email"
             formControlName="email">
@@ -61,8 +61,9 @@
 
         <!-- Password -->
         <div class="form-group">
-          <label>Password</label>
+          <label for="register-password">Password</label>
           <input
+            id="register-password"
             type="password"
             placeholder="Enter Password"
             formControlName="password">
@@ -80,8 +81,9 @@
 
         <!-- Confirm Password -->
         <div class="form-group">
-          <label>Confirm Password</label>
+          <label for="register-confirm-password">Confirm password</label>
           <input
+            id="register-confirm-password"
             type="password"
             placeholder="Confirm Password"
             formControlName="confirmPassword">
