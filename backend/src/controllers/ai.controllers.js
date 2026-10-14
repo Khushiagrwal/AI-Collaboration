@@ -5,7 +5,6 @@ exports.generateDiagramController = async (req, res) => {
     const { prompt } = req.body;
 
     const result = await generateDiagram(prompt);
-
     res.status(200).json({
       success: true,
       result,

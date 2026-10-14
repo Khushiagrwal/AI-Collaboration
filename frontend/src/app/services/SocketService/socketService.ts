@@ -31,14 +31,17 @@ export class SocketService {
 
     onDrawStart(callback: (data: any) => void) {
     this.socket.on('draw-start', callback);
+    return () => this.socket.off('draw-start', callback);
     }
 
     onDraw(callback: (data: any) => void) {
     this.socket.on('draw', callback);
+    return () => this.socket.off('draw', callback);
     }
 
     onDrawEnd(callback: (data: any) => void) {
     this.socket.on('draw-end', callback);
+    return () => this.socket.off('draw-end', callback);
     }
 
     drawShape(data: any) {
@@ -47,6 +50,7 @@ export class SocketService {
 
     onDrawShape(callback: (data: any) => void) {
     this.socket.on('draw-shape', callback);
+    return () => this.socket.off('draw-shape', callback);
     }
 
     clearBoard(boardId: string) {
@@ -55,6 +59,7 @@ export class SocketService {
 
     onClearBoard(callback: () => void) {
     this.socket.on('clear-board', callback);
+    return () => this.socket.off('clear-board', callback);
     }
 
     updateCursor(data: any) {
@@ -63,6 +68,7 @@ export class SocketService {
 
     onCursorMove(callback: (data: any) => void) {
     this.socket.on('cursor-move', callback);
+    return () => this.socket.off('cursor-move', callback);
     }
 
     leaveCursor(boardId: string) {
@@ -71,6 +77,7 @@ export class SocketService {
 
     onCursorLeave(callback: (data: any) => void) {
     this.socket.on('cursor-leave', callback);
+    return () => this.socket.off('cursor-leave', callback);
     }
 
     sendAiDiagram(data: any) {
@@ -79,6 +86,7 @@ export class SocketService {
 
     onAiDiagram(callback: (data: any) => void) {
     this.socket.on('ai-diagram', callback);
+    return () => this.socket.off('ai-diagram', callback);
     }
 
     

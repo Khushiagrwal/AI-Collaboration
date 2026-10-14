@@ -1,13 +1,16 @@
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 
-import { Invite } from './invite';
+import { InvitationService } from './invite';
 
-describe('Invite', () => {
-  let service: Invite;
+describe('InvitationService', () => {
+  let service: InvitationService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(Invite);
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient()]
+    });
+    service = TestBed.inject(InvitationService);
   });
 
   it('should be created', () => {

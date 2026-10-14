@@ -196,6 +196,7 @@
     <aside class="toolbar" aria-label="Drawing tools">
       <span class="toolbar-label">TOOLS</span>
       <button type="button" class="tool-button" [class.active]="activeTool === 'select'" title="Select and move" aria-label="Select and move" (click)="activeTool = 'select'"><span aria-hidden="true">↖</span></button>
+      <button type="button" class="tool-button" [class.active]="activeTool === 'hand'" title="Pan canvas" aria-label="Pan canvas" (click)="activeTool = 'hand'"><span aria-hidden="true">✋</span></button>
       <button type="button" class="tool-button pen-tool" [class.active]="activeTool === 'pen'" title="Pencil color: click to change"
         aria-label="Pencil tool. Click again to change color" (click)="activeTool = 'pen'; toggleColorPicker()">
         <span aria-hidden="true">✎</span>
@@ -227,9 +228,14 @@
     </aside>
 
 
-    <section class="canvas-wrapper">
-      <canvas #boardCanvas aria-label="Collaborative whiteboard canvas" (mousedown)="startDrawing($event)" (mousemove)="draw($event); trackCursor($event)"
-        (mouseup)="stopDrawing()" (mouseleave)="stopDrawing(); stopTrackingCursor()">
+    <section class="canvas-wrapper" (scroll)="updateCanvasLayout()">
+      <canvas #boardCanvas aria-label="Collaborative whiteboard canvas" tabindex="0"
+        [style.width.px]="canvasCssWidth" [style.height.px]="canvasCssHeight"
+        [style.marginLeft.px]="canvasOffsetX" [style.marginTop.px]="canvasOffsetY"
+        [style.cursor]="activeTool === 'hand' ? (isDrawing ? 'grabbing' : 'grab') : 'crosshair'"
+        (pointerdown)="startDrawing($event)" (pointermove)="draw($event); trackCursor($event)"
+        (pointerup)="stopDrawing($event)" (pointercancel)="stopDrawing($event); stopTrackingCursor()"
+        (pointerleave)="stopTrackingCursor()">
       </canvas>
       @if (isTyping) {
       <input #textInput class="canvas-text-input" [style.left.px]="textX" [style.top.px]="textY"
@@ -237,7 +243,10 @@
         (keydown.enter)="finishText()" (keydown.escape)="cancelText()" autofocus />
       }
 
-      <div class="cursor-layer">
+      <div class="cursor-layer"
+        [style.left.px]="canvasOffsetX - canvasScrollLeft"
+        [style.top.px]="canvasOffsetY - canvasScrollTop"
+        [style.width.px]="canvasCssWidth" [style.height.px]="canvasCssHeight">
         @for (cursor of remoteCursorEntries; track cursor[0]) {
         <div class="remote-cursor" [style.left.%]="cursor[1].x" [style.top.%]="cursor[1].y">
 
@@ -275,16 +284,16 @@
         <p>Describe a process, product, or system and let AI sketch a first pass.</p>
       </div>
 
-      <section class="proposal-card" *ngIf="pendingAiDiagram()" aria-labelledby="proposal-title">
+      <section class="proposal-card" *ngIf="pendingAiDiagram() as diagram" aria-labelledby="proposal-title">
         <div class="proposal-label"><span aria-hidden="true">✦</span> NEW PROPOSAL</div>
         <h3 id="proposal-title">A starting point for your board</h3>
-        <p class="proposal-summary">{{ pendingAiDiagram().nodes.length }} nodes <span aria-hidden="true">·</span> {{ pendingAiDiagram().edges.length }} connections</p>
+        <p class="proposal-summary">{{ diagram.nodes.length }} nodes <span aria-hidden="true">·</span> {{ diagram.edges.length }} connections</p>
         <div class="proposal-nodes">
           <div class="proposal-node" *ngFor="let node of pendingDiagramNodes; let i = index">
             <span class="proposal-node-dot" [class.dot-peach]="i % 3 === 1" [class.dot-sage]="i % 3 === 2"></span>
             <span>{{ node.label }}</span>
           </div>
-          <span class="proposal-more" *ngIf="pendingAiDiagram().nodes.length > pendingDiagramNodes.length">+{{ pendingAiDiagram().nodes.length - pendingDiagramNodes.length }} more nodes</span>
+          <span class="proposal-more" *ngIf="diagram.nodes.length > pendingDiagramNodes.length">+{{ diagram.nodes.length - pendingDiagramNodes.length }} more nodes</span>
         </div>
         <div class="evidence-note warning-note">
           <span aria-hidden="true">!</span>

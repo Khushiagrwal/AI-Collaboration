@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   inject,
+  OnDestroy,
   OnInit,
   signal,
   ViewChild
@@ -22,6 +23,12 @@ import { InvitationService } from '../../services/invitation/invite';
 import { NotificationService } from '../../services/notification.service';
 import { AiPanalModal } from '../../components/ai-panel/ai-panal-modal/ai-panal-modal';
 import { CanvasElement } from '../../models/canvas-element.model';
+import { AiDiagram, AiDiagramLayout, AiNodePosition } from '../../models/ai-diagram.model';
+import { layoutAiDiagram, normalizeAiDiagram } from '../../services/canvas/ai-diagram-layout';
+
+const BASE_CANVAS_WIDTH = 1200;
+const BASE_CANVAS_HEIGHT = 800;
+const MAX_CANVAS_DIMENSION = 16384;
 
 @Component({
   selector: 'app-board',
@@ -36,7 +43,7 @@ import { CanvasElement } from '../../models/canvas-element.model';
   templateUrl: './board.html',
   styleUrl: './board.css',
 })
-export class Board implements OnInit, AfterViewInit {
+export class Board implements OnInit, AfterViewInit, OnDestroy {
 
   private route = inject(ActivatedRoute);
   private boardService = inject(BoardService);
@@ -48,8 +55,8 @@ export class Board implements OnInit, AfterViewInit {
   board = signal<any>(null);
   currentUser = signal<any>(null);
   isOwner = signal(false);
-  canvasElements = signal<any[]>([]);
-  aiDiagrams = signal<any[]>([]);
+  canvasElements = signal<CanvasElement[]>([]);
+  aiDiagrams = signal<AiDiagram[]>([]);
   activeTool:
     | 'select'
     | 'hand'
@@ -93,7 +100,7 @@ export class Board implements OnInit, AfterViewInit {
   remoteCursors = signal<Record<string, any>>({});
   private lastCursorSent = 0;
   showAiModal = false;
-  pendingAiDiagram = signal<any | null>(null);
+  pendingAiDiagram = signal<AiDiagram | null>(null);
   saveStatus = 'Ready to save';
   isSaving = false;
   boardLoadError = false;
@@ -103,6 +110,24 @@ export class Board implements OnInit, AfterViewInit {
   private dragOffsetX = 0;
   private dragOffsetY = 0;
   private activePenElement: CanvasElement | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private readonly socketUnsubscribers: Array<() => void> = [];
+  private readonly queuedAiDiagrams: unknown[] = [];
+  private pendingCanvasData: unknown = null;
+  private activePointerId: number | null = null;
+  canvasCssWidth = BASE_CANVAS_WIDTH;
+  canvasCssHeight = BASE_CANVAS_HEIGHT;
+  canvasOffsetX = 0;
+  canvasOffsetY = 0;
+  canvasScrollLeft = 0;
+  canvasScrollTop = 0;
+  private textCanvasX = 0;
+  private textCanvasY = 0;
+  private panStartX = 0;
+  private panStartY = 0;
+  private panStartScrollLeft = 0;
+  private panStartScrollTop = 0;
+  private readonly onWindowResize = (): void => this.updateCanvasLayout();
 
   get remoteCursorEntries() {
     return Object.entries(this.remoteCursors());
@@ -145,67 +170,127 @@ export class Board implements OnInit, AfterViewInit {
       this.loadBoard(id);
       this.socketService.joinBoard(id)
     }
-    this.socketService.onDraw((data) => {
+    this.socketUnsubscribers.push(this.socketService.onDraw((data) => {
       this.drawRemote(data);
-    })
+    }));
 
-    this.socketService.onDrawStart((data) => {
+    this.socketUnsubscribers.push(this.socketService.onDrawStart((data) => {
       this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
-    });
+    }));
 
-    this.socketService.onDrawEnd((data) => {
+    this.socketUnsubscribers.push(this.socketService.onDrawEnd((data) => {
       this.remoteStrokePoints.delete(data.socketId);
-    });
+    }));
 
-    this.socketService.onDrawShape((data) => {
+    this.socketUnsubscribers.push(this.socketService.onDrawShape((data) => {
       this.drawRemoteShape(data);
-    });
+    }));
 
-    this.socketService.onClearBoard(() => {
-      this.ctx.clearRect(
-        0,
-        0,
-        this.canvas.nativeElement.width,
-        this.canvas.nativeElement.height
-      );
-    });
+    this.socketUnsubscribers.push(this.socketService.onClearBoard(() => this.clearCanvasContent()));
 
-    this.socketService.onCursorMove((data) => {
+    this.socketUnsubscribers.push(this.socketService.onCursorMove((data) => {
       this.remoteCursors.update(cursors => ({
         ...cursors,
         [data.socketId]: data
       }));
-    });
+    }));
 
-    this.socketService.onCursorLeave((data) => {
+    this.socketUnsubscribers.push(this.socketService.onCursorLeave((data) => {
       this.remoteStrokePoints.delete(data.socketId);
       this.remoteCursors.update(cursors => {
         const updated = { ...cursors };
         delete updated[data.socketId];
         return updated;
       });
-    });
+    }));
 
-    this.socketService.onAiDiagram((diagram) => {
-      console.log('AI diagram received:', diagram);
-      this.drawAiDiagram(diagram);
-    });
-
-
+    this.socketUnsubscribers.push(this.socketService.onAiDiagram((diagram) => {
+      if (!this.ctx) {
+        this.queuedAiDiagrams.push(diagram);
+        return;
+      }
+      this.receiveAiDiagram(diagram);
+    }));
 
   }
 
   ngAfterViewInit(): void {
 
     const canvas = this.canvas.nativeElement;
-    const rect = canvas.getBoundingClientRect();
+    canvas.width = BASE_CANVAS_WIDTH;
+    canvas.height = BASE_CANVAS_HEIGHT;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      this.notifications.error('Could not initialize the whiteboard canvas');
+      return;
+    }
+    this.ctx = context;
 
-    canvas.width = Math.max(600, rect.width);
-    canvas.height = Math.max(400, rect.height);
+    this.setCanvasContextDefaults();
+    const viewport = canvas.parentElement;
+    if (viewport && typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.updateCanvasLayout());
+      this.resizeObserver.observe(viewport);
+    } else {
+      window.addEventListener('resize', this.onWindowResize);
+    }
+    this.updateCanvasLayout();
 
-    this.ctx = canvas.getContext('2d')!;
+    if (this.pendingCanvasData !== null) {
+      const data = this.pendingCanvasData;
+      this.pendingCanvasData = null;
+      this.loadSavedCanvas(data);
+    } else if (this.aiDiagrams().length) {
+      this.renderStoredAiDiagrams();
+    }
 
-    // Default canvas settings
+    for (const diagram of this.queuedAiDiagrams.splice(0)) {
+      this.receiveAiDiagram(diagram);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    window.removeEventListener('resize', this.onWindowResize);
+    for (const unsubscribe of this.socketUnsubscribers.splice(0)) {
+      unsubscribe();
+    }
+  }
+
+  updateCanvasLayout(): void {
+    if (!this.canvas?.nativeElement) {
+      return;
+    }
+    const canvas = this.canvas.nativeElement;
+    const viewport = canvas.parentElement;
+    if (!viewport) {
+      return;
+    }
+
+    const scale = Math.min(
+      1,
+      viewport.clientWidth / BASE_CANVAS_WIDTH || 1,
+      viewport.clientHeight / BASE_CANVAS_HEIGHT || 1
+    );
+    this.canvasCssWidth = Math.max(1, canvas.width * scale);
+    this.canvasCssHeight = Math.max(1, canvas.height * scale);
+    this.canvasOffsetX = this.canvasCssWidth <= viewport.clientWidth
+      ? (viewport.clientWidth - this.canvasCssWidth) / 2
+      : 0;
+    this.canvasOffsetY = this.canvasCssHeight <= viewport.clientHeight
+      ? (viewport.clientHeight - this.canvasCssHeight) / 2
+      : 0;
+    this.canvasScrollLeft = viewport.scrollLeft;
+    this.canvasScrollTop = viewport.scrollTop;
+
+    if (this.isTyping) {
+      this.textX = this.canvasOffsetX - this.canvasScrollLeft + this.textCanvasX * scale;
+      this.textY = this.canvasOffsetY - this.canvasScrollTop + this.textCanvasY * scale;
+    }
+  }
+
+  private setCanvasContextDefaults(): void {
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
     this.ctx.strokeStyle = this.color;
@@ -213,6 +298,9 @@ export class Board implements OnInit, AfterViewInit {
   }
 
   private drawRemoteShape(data: any): void {
+    if (!this.ctx) {
+      return;
+    }
 
     if (data.tool === 'line') {
 
@@ -279,6 +367,9 @@ export class Board implements OnInit, AfterViewInit {
   }
 
   private drawRemote(data: any): void {
+    if (!this.ctx) {
+      return;
+    }
     const previousPoint = this.remoteStrokePoints.get(data.socketId);
     if (!previousPoint) {
       this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
@@ -318,7 +409,7 @@ export class Board implements OnInit, AfterViewInit {
     this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
   }
 
-  private getMousePosition(event: MouseEvent) {
+  private getMousePosition(event: MouseEvent): { x: number; y: number } {
 
     const canvas = this.canvas.nativeElement;
 
@@ -341,15 +432,16 @@ export class Board implements OnInit, AfterViewInit {
       this.canvasElements(),
       this.selectedElement()
     );
+    this.renderStoredAiDiagrams();
   }
   private addText(event: MouseEvent): void {
 
-    const canvas = this.canvas.nativeElement;
-    const rect = canvas.getBoundingClientRect();
-    this.textX = event.clientX - rect.left;
-    this.textY = event.clientY - rect.top;
+    const position = this.getMousePosition(event);
+    this.textCanvasX = position.x;
+    this.textCanvasY = position.y;
     this.currentText = '';
     this.isTyping = true;
+    this.updateCanvasLayout();
   }
 
   finishText(): void {
@@ -363,13 +455,8 @@ export class Board implements OnInit, AfterViewInit {
 
     const canvas = this.canvas.nativeElement;
 
-    const rect = canvas.getBoundingClientRect();
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    const canvasX = this.textX * scaleX;
-    const canvasY = this.textY * scaleY;
+    const canvasX = this.textCanvasX;
+    const canvasY = this.textCanvasY;
 
     this.ctx.globalCompositeOperation = 'source-over';
 
@@ -421,51 +508,26 @@ export class Board implements OnInit, AfterViewInit {
         this.board.set(res.board);
         this.currentUser.set(res.currentUser);
         this.isOwner.set(res.isOwner === true);
+        const savedDiagrams = Array.isArray(res.board?.aiDiagrams)
+          ? res.board.aiDiagrams
+              .map((diagram: unknown) => normalizeAiDiagram(diagram))
+              .filter((diagram: AiDiagram | null): diagram is AiDiagram => diagram !== null)
+          : [];
+        this.aiDiagrams.set(savedDiagrams);
 
         const data = res.board?.canvasData;
 
-        if (!data) {
+        if (!data || (Array.isArray(data) && !data.length)) {
+          if (this.ctx && savedDiagrams.length) {
+            this.renderStoredAiDiagrams();
+          }
           return;
         }
 
-        const drawSavedCanvas = () => {
-
-          const image = new Image();
-
-          image.onload = () => {
-
-            this.ctx.clearRect(
-              0,
-              0,
-              this.canvas.nativeElement.width,
-              this.canvas.nativeElement.height
-            );
-
-            this.ctx.drawImage(
-              image,
-              0,
-              0,
-              this.canvas.nativeElement.width,
-              this.canvas.nativeElement.height
-            );
-          };
-
-          image.src = data;
-        };
-
         if (this.ctx) {
-
-          drawSavedCanvas();
-
+          this.loadSavedCanvas(data);
         } else {
-
-          setTimeout(() => {
-
-            if (this.ctx) {
-              drawSavedCanvas();
-            }
-
-          }, 0);
+          this.pendingCanvasData = data;
         }
       },
       error: (err) => {
@@ -476,7 +538,84 @@ export class Board implements OnInit, AfterViewInit {
     });
   }
 
-  startDrawing(event: MouseEvent): void {
+  private loadSavedCanvas(data: unknown): void {
+    const source = Array.isArray(data) ? data.join('') : data;
+    if (typeof source !== 'string' || !source) {
+      this.notifications.error('The saved board canvas data is invalid');
+      return;
+    }
+
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.max(
+        1,
+        Math.min(
+          BASE_CANVAS_WIDTH / image.naturalWidth,
+          BASE_CANVAS_HEIGHT / image.naturalHeight
+        )
+      );
+      const imageWidth = image.naturalWidth * scale;
+      const imageHeight = image.naturalHeight * scale;
+      const width = Math.max(BASE_CANVAS_WIDTH, Math.ceil(imageWidth));
+      const height = Math.max(BASE_CANVAS_HEIGHT, Math.ceil(imageHeight));
+      if (!this.resizeCanvas(width, height)) {
+        return;
+      }
+      const canvas = this.canvas.nativeElement;
+      this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+      this.ctx.drawImage(
+        image,
+        (canvas.width - imageWidth) / 2,
+        (canvas.height - imageHeight) / 2,
+        imageWidth,
+        imageHeight
+      );
+      this.updateCanvasLayout();
+    };
+    image.onerror = () => this.notifications.error('Could not load the saved board canvas');
+    image.src = source;
+  }
+
+  private resizeCanvas(width: number, height: number): boolean {
+    const canvas = this.canvas.nativeElement;
+    const nextWidth = Math.ceil(Math.max(canvas.width, width));
+    const nextHeight = Math.ceil(Math.max(canvas.height, height));
+    if (
+      nextWidth > MAX_CANVAS_DIMENSION ||
+      nextHeight > MAX_CANVAS_DIMENSION
+    ) {
+      this.notifications.error('This diagram exceeds the maximum supported canvas size');
+      return false;
+    }
+    if (nextWidth === canvas.width && nextHeight === canvas.height) {
+      return true;
+    }
+
+    const snapshot = document.createElement('canvas');
+    snapshot.width = canvas.width;
+    snapshot.height = canvas.height;
+    const snapshotContext = snapshot.getContext('2d');
+    if (!snapshotContext) {
+      this.notifications.error('Could not preserve the current canvas while resizing');
+      return false;
+    }
+    snapshotContext.drawImage(canvas, 0, 0);
+
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+    this.setCanvasContextDefaults();
+    this.ctx.drawImage(snapshot, 0, 0);
+    this.updateCanvasLayout();
+    return true;
+  }
+
+  startDrawing(event: PointerEvent): void {
+    if (!event.isPrimary || this.activePointerId !== null) {
+      return;
+    }
+    this.activePointerId = event.pointerId;
+    this.canvas.nativeElement.setPointerCapture(event.pointerId);
+    event.preventDefault();
 
     const { x, y } = this.getMousePosition(event);
 
@@ -521,7 +660,16 @@ export class Board implements OnInit, AfterViewInit {
     }
 
     if (this.activeTool === 'hand') {
-
+      const viewport = this.canvas.nativeElement.parentElement;
+      if (!viewport) {
+        this.activePointerId = null;
+        return;
+      }
+      this.isDrawing = true;
+      this.panStartX = event.clientX;
+      this.panStartY = event.clientY;
+      this.panStartScrollLeft = viewport.scrollLeft;
+      this.panStartScrollTop = viewport.scrollTop;
       return;
     }
 
@@ -613,15 +761,25 @@ export class Board implements OnInit, AfterViewInit {
     }
   }
 
-  draw(event: MouseEvent): void {
+  draw(event: PointerEvent): void {
 
-    if (!this.isDrawing) {
+    if (!this.isDrawing ||
+      (this.activePointerId !== null && event.pointerId !== this.activePointerId)) {
       return;
     }
 
     const { x, y } = this.getMousePosition(event);
     this.currentX = x;
     this.currentY = y;
+    if (this.activeTool === 'hand') {
+      const viewport = this.canvas.nativeElement.parentElement;
+      if (viewport) {
+        viewport.scrollLeft = this.panStartScrollLeft - (event.clientX - this.panStartX);
+        viewport.scrollTop = this.panStartScrollTop - (event.clientY - this.panStartY);
+      }
+      this.updateCanvasLayout();
+      return;
+    }
     if (this.activeTool === 'select') {
 
       if (!this.isDragging) {
@@ -838,7 +996,7 @@ export class Board implements OnInit, AfterViewInit {
 
   }
 
-  trackCursor(event: MouseEvent): void {
+  trackCursor(event: PointerEvent): void {
     const now = Date.now();
     if (now - this.lastCursorSent < 40) {
       return;
@@ -863,7 +1021,16 @@ export class Board implements OnInit, AfterViewInit {
     }
   }
 
-  stopDrawing(): void {
+  stopDrawing(event?: PointerEvent): void {
+    if (
+      event &&
+      this.activePointerId !== null &&
+      event.pointerId !== this.activePointerId
+    ) {
+      return;
+    }
+    this.activePointerId = null;
+
     if (this.activeTool === 'select') {
 
       this.isDragging = false;
@@ -946,18 +1113,22 @@ export class Board implements OnInit, AfterViewInit {
   }
 
   clearCanvas(): void {
-
-    const canvas = this.canvas.nativeElement;
-
-    this.ctx.clearRect(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
+    this.clearCanvasContent();
     this.socketService.clearBoard(
       this.board()?._id
     );
+  }
+
+  private clearCanvasContent(): void {
+    if (!this.ctx || !this.canvas?.nativeElement) {
+      return;
+    }
+    this.ctx.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
+    this.canvasElements.set([]);
+    this.aiDiagrams.set([]);
+    this.canvaService.clear();
+    this.selectedElement.set(null);
+    this.remoteStrokePoints.clear();
   }
 
   saveBoard(): void {
@@ -978,7 +1149,8 @@ export class Board implements OnInit, AfterViewInit {
 
 
     const data = {
-      canvasData: canvasData
+      canvasData,
+      aiDiagrams: this.aiDiagrams()
     };
 
 
@@ -1059,8 +1231,9 @@ export class Board implements OnInit, AfterViewInit {
     this.linkCopied = false;
   }
 
-  onDiagramGenerated(diagram: any): void {
-    if (!diagram || !Array.isArray(diagram.nodes) || !diagram.nodes.length || !Array.isArray(diagram.edges)) {
+  onDiagramGenerated(value: unknown): void {
+    const diagram = normalizeAiDiagram(value);
+    if (!diagram) {
       this.notifications.error('The AI returned an invalid diagram. Please try again.');
       this.showAiModal = false;
       return;
@@ -1075,7 +1248,9 @@ export class Board implements OnInit, AfterViewInit {
       return;
     }
 
-    this.drawAiDiagram(diagram);
+    if (!this.drawAiDiagram(diagram)) {
+      return;
+    }
     this.socketService.sendAiDiagram({
       boardId: this.board()?._id,
       diagram
@@ -1088,149 +1263,175 @@ export class Board implements OnInit, AfterViewInit {
     this.pendingAiDiagram.set(null);
   }
 
-  drawAiDiagram(diagram: any): void {
-    const nodes = diagram.nodes;
-    const edges = diagram.edges;
-
-    if (!Array.isArray(nodes) || !Array.isArray(edges) || !this.ctx) {
-      this.notifications.error('Could not draw this diagram. Please try generating it again.');
-      return;
+  drawAiDiagram(value: unknown): boolean {
+    const diagram = normalizeAiDiagram(value);
+    if (!diagram) {
+      this.notifications.error('The AI returned an invalid diagram. Please try again.');
+      return false;
     }
-
-    const canvas = this.canvas?.nativeElement;
-    const canvasWidth = canvas ? canvas.width : 1000;
-    const canvasHeight = canvas ? canvas.height : 700;
-
-    const padding = 30;
-    const nodeWidth = 200;
-    const nodeHeight = 72;
-    const horizontalGap = 80;
-    const verticalGap = 90;
-
-    const columns = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(nodes.length))));
-    const rows = Math.ceil(nodes.length / columns);
-
-    const maxX = Math.max(padding, canvasWidth - padding - nodeWidth);
-    const maxY = Math.max(padding, canvasHeight - padding - nodeHeight);
-
-    const positions: Record<string, { x: number; y: number }> = {};
-
-    nodes.forEach((node: any, index: number) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-
-      const x = Math.min(
-        maxX,
-        padding + column * (nodeWidth + horizontalGap)
-      );
-
-      const y = Math.min(
-        maxY,
-        padding + row * (nodeHeight + verticalGap)
-      );
-
-      positions[node.id] = {
-        x: Math.max(padding, x),
-        y: Math.max(padding, y),
-      };
-    });
-
-    // Draw edges first
-    edges.forEach((edge: any) => {
-      const source = positions[edge.source];
-      const target = positions[edge.target];
-
-      if (!source || !target) {
-        return;
-      }
-
-      this.drawAiArrow(
-        source.x + nodeWidth / 2,
-        source.y + nodeHeight / 2,
-        target.x + nodeWidth / 2,
-        target.y + nodeHeight / 2
-      );
-    });
-
-    // Draw nodes
-    nodes.forEach((node: any) => {
-      const position = positions[node.id];
-
-      this.drawAiNode(
-        position.x,
-        position.y,
-        nodeWidth,
-        nodeHeight,
-        node.label,
-        node.type
-      );
-    });
+    let offsetY = 0;
+    for (const existing of this.aiDiagrams()) {
+      offsetY += this.getAiDiagramContentHeight(existing) + 48;
+    }
+    if (!this.renderAiDiagram(diagram, offsetY)) {
+      return false;
+    }
+    this.aiDiagrams.update(diagrams => [...diagrams, diagram]);
+    return true;
   }
 
-  drawAiNode(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    label: string,
-    type: string
-  ): void {
+  private receiveAiDiagram(value: unknown): void {
+    if (this.drawAiDiagram(value)) {
+      this.notifications.success('A collaborator added an AI diagram');
+    }
+  }
+
+  private renderStoredAiDiagrams(): void {
+    if (!this.ctx) {
+      return;
+    }
+    let offsetY = 0;
+    for (const diagram of this.aiDiagrams()) {
+      this.renderAiDiagram(diagram, offsetY);
+      offsetY += this.getAiDiagramContentHeight(diagram) + 48;
+    }
+  }
+
+  private getAiDiagramContentHeight(diagram: AiDiagram): number {
+    const layout = layoutAiDiagram(diagram);
+    let bottom = 0;
+    for (const position of Object.values(layout.positions)) {
+      bottom = Math.max(bottom, position.y + position.height);
+    }
+    return bottom;
+  }
+
+  private renderAiDiagram(diagram: AiDiagram, offsetY = 0): boolean {
+    const layout = layoutAiDiagram(diagram);
+    const contentHeight = this.getAiDiagramContentHeight(diagram);
+    if (!this.resizeCanvas(layout.width, contentHeight + offsetY + 48)) {
+      return false;
+    }
+
+    for (const edge of layout.edges) {
+      this.drawAiEdge(edge, offsetY);
+    }
+    for (const node of diagram.nodes) {
+      const position = layout.positions[node.id];
+      if (position) {
+        this.drawAiNode(
+          { ...position, y: position.y + offsetY },
+          node.label,
+          node.shape
+        );
+      }
+    }
+    return true;
+  }
+
+  private drawAiEdge(edgeLayout: AiDiagramLayout['edges'][number], offsetY: number): void {
+    const { points, edge } = edgeLayout;
+    const offsetPoints = points.map(point => ({ x: point.x, y: point.y + offsetY }));
+    const start = offsetPoints[0];
+    const end = offsetPoints[offsetPoints.length - 1];
+    const previous = offsetPoints[offsetPoints.length - 2];
+    const angle = Math.atan2(end.y - previous.y, end.x - previous.x);
+    const arrowSize = 9;
 
     this.ctx.save();
-
-    const nodeWidth = Math.min(width, Math.max(150, width));
-    const nodeHeight = Math.min(height, Math.max(54, height));
-
-    const gradient = this.ctx.createLinearGradient(x, y, x + nodeWidth, y + nodeHeight);
-    gradient.addColorStop(0, '#fffdfa');
-    gradient.addColorStop(1, '#f6f1ff');
-
-    this.ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
-    this.ctx.shadowBlur = 10;
-    this.ctx.shadowOffsetY = 4;
-
+    const gradient = this.ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+    gradient.addColorStop(0, '#9ca3af');
+    gradient.addColorStop(1, '#7955d9');
+    this.ctx.strokeStyle = gradient;
+    this.ctx.fillStyle = '#7955d9';
+    this.ctx.lineWidth = 2.2;
+    this.ctx.shadowColor = 'rgba(121, 85, 217, 0.18)';
+    this.ctx.shadowBlur = 6;
     this.ctx.beginPath();
-    this.ctx.roundRect(x, y, nodeWidth, nodeHeight, 16);
-    this.ctx.fillStyle = gradient;
-    this.ctx.fill();
-
-    this.ctx.shadowColor = 'transparent';
-    this.ctx.shadowBlur = 0;
-    this.ctx.shadowOffsetY = 0;
-
-    this.ctx.strokeStyle = '#7955d9';
-    this.ctx.lineWidth = 2;
+    this.ctx.moveTo(start.x, start.y);
+    for (const point of offsetPoints.slice(1)) {
+      this.ctx.lineTo(point.x, point.y);
+    }
     this.ctx.stroke();
 
-    this.ctx.fillStyle = '#7955d9';
-    this.ctx.fillRect(x + 12, y + 12, 6, nodeHeight - 24);
+    this.ctx.beginPath();
+    this.ctx.moveTo(end.x, end.y);
+    this.ctx.lineTo(
+      end.x - arrowSize * Math.cos(angle - Math.PI / 6),
+      end.y - arrowSize * Math.sin(angle - Math.PI / 6)
+    );
+    this.ctx.lineTo(
+      end.x - arrowSize * Math.cos(angle + Math.PI / 6),
+      end.y - arrowSize * Math.sin(angle + Math.PI / 6)
+    );
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.restore();
 
-    const wrappedLabel = this.wrapAiText(label, nodeWidth - 34, '600 13px Arial');
-    const labelLines = wrappedLabel.slice(0, 2);
+    if (edge.label) {
+      this.ctx.save();
+      this.ctx.font = '12px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      const textWidth = this.ctx.measureText(edge.label).width;
+      this.ctx.fillStyle = '#fffdfa';
+      const labelY = edgeLayout.labelY + offsetY;
+      this.ctx.fillRect(edgeLayout.labelX - textWidth / 2 - 5, labelY - 9, textWidth + 10, 18);
+      this.ctx.fillStyle = '#5b4b85';
+      this.ctx.fillText(edge.label, edgeLayout.labelX, labelY);
+      this.ctx.restore();
+    }
+  }
+
+  private drawAiNode(position: AiNodePosition, label: string, shape: string): void {
+    const { x, y, width, height } = position;
+    this.ctx.save();
+    this.ctx.beginPath();
+    switch (shape) {
+      case 'circle':
+        this.ctx.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, 0, Math.PI * 2);
+        break;
+      case 'diamond':
+        this.ctx.moveTo(x + width / 2, y);
+        this.ctx.lineTo(x + width, y + height / 2);
+        this.ctx.lineTo(x + width / 2, y + height);
+        this.ctx.lineTo(x, y + height / 2);
+        this.ctx.closePath();
+        break;
+      case 'terminator':
+        this.ctx.roundRect(x, y, width, height, height / 2);
+        break;
+      case 'rectangle':
+      default:
+        this.ctx.roundRect(x, y, width, height, 6);
+        break;
+    }
+
+    this.ctx.fillStyle = '#f6f1ff';
+    this.ctx.strokeStyle = '#7955d9';
+    this.ctx.lineWidth = 2;
+    this.ctx.fill();
+    this.ctx.stroke();
 
     this.ctx.fillStyle = '#3b3440';
     this.ctx.font = '600 13px Arial';
-    this.ctx.textAlign = 'left';
+    this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-
-    labelLines.forEach((line: string, index: number) => {
-      const lineY = y + nodeHeight / 2 - (labelLines.length > 1 ? 8 : 0) + (index - (labelLines.length - 1) / 2) * 14;
-      this.ctx.fillText(line, x + 26, lineY);
-    });
-
-    this.ctx.fillStyle = '#817887';
-    this.ctx.font = '11px Arial';
-    this.ctx.textAlign = 'left';
-
-    const typeText = this.truncateText(type, nodeWidth - 38);
-    this.ctx.fillText(
-      typeText,
-      x + 26,
-      y + nodeHeight - 16
+    const maxTextWidth = width - 24;
+    const lines = this.wrapAiText(label, maxTextWidth, '600 13px Arial');
+    const maxLines = Math.max(1, Math.floor((height - 20) / 16));
+    if (lines.length > maxLines) {
+      lines.length = maxLines;
+      lines[maxLines - 1] = this.truncateText(lines[maxLines - 1], maxTextWidth);
+    }
+    const lineHeight = 16;
+    const startY = y + height / 2 - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, index) =>
+      this.ctx.fillText(line, x + width / 2, startY + index * lineHeight)
     );
-
     this.ctx.restore();
   }
+
 
   private wrapAiText(text: string, maxWidth: number, font: string): string[] {
     const words = (text || '').split(/\s+/).filter(Boolean);
@@ -1246,12 +1447,30 @@ export class Board implements OnInit, AfterViewInit {
 
     for (const word of words) {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
-      if (this.ctx.measureText(testLine).width <= maxWidth || !currentLine) {
+      if (this.ctx.measureText(testLine).width <= maxWidth) {
         currentLine = testLine;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
+        continue;
       }
+
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = '';
+      }
+
+      if (this.ctx.measureText(word).width <= maxWidth) {
+        currentLine = word;
+        continue;
+      }
+
+      let segment = '';
+      for (const character of word) {
+        if (segment && this.ctx.measureText(segment + character).width > maxWidth) {
+          lines.push(segment);
+          segment = '';
+        }
+        segment += character;
+      }
+      currentLine = segment;
     }
 
     if (currentLine) {
@@ -1270,7 +1489,7 @@ export class Board implements OnInit, AfterViewInit {
     }
 
     this.ctx.save();
-    this.ctx.font = '11px Arial';
+    this.ctx.font = '600 13px Arial';
 
     if (this.ctx.measureText(safeText).width <= maxWidth) {
       this.ctx.restore();
@@ -1284,50 +1503,5 @@ export class Board implements OnInit, AfterViewInit {
 
     this.ctx.restore();
     return `${truncated}...`;
-  }
-
-  drawAiArrow(
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number
-  ): void {
-
-    this.ctx.save();
-
-    const angle = Math.atan2(endY - startY, endX - startX);
-    const arrowSize = 9;
-
-    const lineGradient = this.ctx.createLinearGradient(startX, startY, endX, endY);
-    lineGradient.addColorStop(0, '#9ca3af');
-    lineGradient.addColorStop(1, '#7955d9');
-
-    this.ctx.strokeStyle = lineGradient;
-    this.ctx.fillStyle = '#7955d9';
-    this.ctx.lineWidth = 2.2;
-    this.ctx.shadowColor = 'rgba(121, 85, 217, 0.18)';
-    this.ctx.shadowBlur = 8;
-
-    // Line
-    this.ctx.beginPath();
-    this.ctx.moveTo(startX, startY);
-    this.ctx.lineTo(endX, endY);
-    this.ctx.stroke();
-
-    // Arrow head
-    this.ctx.beginPath();
-    this.ctx.moveTo(endX, endY);
-    this.ctx.lineTo(
-      endX - arrowSize * Math.cos(angle - Math.PI / 6),
-      endY - arrowSize * Math.sin(angle - Math.PI / 6)
-    );
-    this.ctx.lineTo(
-      endX - arrowSize * Math.cos(angle + Math.PI / 6),
-      endY - arrowSize * Math.sin(angle + Math.PI / 6)
-    );
-    this.ctx.closePath();
-    this.ctx.fill();
-
-    this.ctx.restore();
   }
 }

@@ -418,20 +418,27 @@
   min-width: 0;
   min-height: 0;
   margin: 20px 15px 18px 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
   touch-action: none;
-  border: 1px solid #e9e4dd;
+  flex: none;
+  border: 0;
   border-radius: 14px;
   background-color: #fffdfa;
   background-image: radial-gradient(#ded8df .72px, transparent .72px);
   background-position: 2px 2px;
   background-size: 19px 19px;
-  box-shadow: 0 7px 24px rgba(57, 45, 67, .055);
+  box-shadow: inset 0 0 0 1px #e9e4dd, 0 7px 24px rgba(57, 45, 67, .055);
 }
 
 .canvas-text-input {
@@ -457,7 +464,6 @@ canvas {
 .cursor-layer {
   position: absolute;
   z-index: 20;
-  inset: 0;
   overflow: hidden;
   pointer-events: none;
 }
