@@ -23,7 +23,7 @@ import { InvitationService } from '../../services/invitation/invite';
 import { NotificationService } from '../../services/notification.service';
 import { AiPanalModal } from '../../components/ai-panel/ai-panal-modal/ai-panal-modal';
 import { CanvasElement } from '../../models/canvas-element.model';
-import { AiDiagram, AiDiagramLayout, AiNodePosition } from '../../models/ai-diagram.model';
+import { AiDiagram, AiDiagramLayout } from '../../models/ai-diagram.model';
 import { layoutAiDiagram, normalizeAiDiagram } from '../../services/canvas/ai-diagram-layout';
 
 const BASE_CANVAS_WIDTH = 1200;
@@ -84,6 +84,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   private startY = 0;
   private snapshot!: ImageData;
   isTyping = false;
+  isEditingAiLabel = false;
   currentText = '';
   textX = 0;
   textY = 0;
@@ -95,6 +96,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   inviteError = '';
   linkCopied = false;
   private remoteStrokePoints = new Map<string, { x: number; y: number }>();
+  private remoteStrokeElements = new Map<string, CanvasElement>();
   private currentX = 0;
   private currentY = 0;
   remoteCursors = signal<Record<string, any>>({});
@@ -114,6 +116,8 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   private readonly socketUnsubscribers: Array<() => void> = [];
   private readonly queuedAiDiagrams: unknown[] = [];
   private pendingCanvasData: unknown = null;
+  private legacyCanvasImage: HTMLImageElement | null = null;
+  private legacyImagePlacement = { x: 0, y: 0, width: 0, height: 0 };
   private activePointerId: number | null = null;
   canvasCssWidth = BASE_CANVAS_WIDTH;
   canvasCssHeight = BASE_CANVAS_HEIGHT;
@@ -151,6 +155,17 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     return (this.pendingAiDiagram()?.nodes ?? []).slice(0, 4);
   }
 
+  get selectedAiNode(): { diagram: AiDiagram; node: AiDiagram['nodes'][number] } | null {
+    const selected = this.selectedElement();
+    const data = selected?.data;
+    if (selected?.type !== 'ai' || !data?.diagramId || !data.nodeId) {
+      return null;
+    }
+    const diagram = this.aiDiagrams().find(item => item.diagramId === data.diagramId);
+    const node = diagram?.nodes.find(item => item.id === data.nodeId);
+    return diagram && node ? { diagram, node } : null;
+  }
+
   selectColor(color: string): void {
     this.color = color;
     this.showColorPicker = false;
@@ -176,10 +191,22 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
     this.socketUnsubscribers.push(this.socketService.onDrawStart((data) => {
       this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
+      this.remoteStrokeElements.set(data.socketId, {
+        id: crypto.randomUUID(),
+        type: data.tool === 'eraser' ? 'eraser' : 'pen',
+        color: data.color,
+        points: [{ x: data.x, y: data.y }]
+      });
     }));
 
     this.socketUnsubscribers.push(this.socketService.onDrawEnd((data) => {
       this.remoteStrokePoints.delete(data.socketId);
+      const element = this.remoteStrokeElements.get(data.socketId);
+      if (element) {
+        this.canvasElements.update(elements => [...elements, element]);
+        this.remoteStrokeElements.delete(data.socketId);
+        this.renderCanvas();
+      }
     }));
 
     this.socketUnsubscribers.push(this.socketService.onDrawShape((data) => {
@@ -197,6 +224,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
     this.socketUnsubscribers.push(this.socketService.onCursorLeave((data) => {
       this.remoteStrokePoints.delete(data.socketId);
+      this.remoteStrokeElements.delete(data.socketId);
       this.remoteCursors.update(cursors => {
         const updated = { ...cursors };
         delete updated[data.socketId];
@@ -284,7 +312,15 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     this.canvasScrollLeft = viewport.scrollLeft;
     this.canvasScrollTop = viewport.scrollTop;
 
-    if (this.isTyping) {
+    if (this.isTyping && this.isEditingAiLabel) {
+      const selected = this.selectedAiNode;
+      if (selected?.node.x !== undefined && selected.node.y !== undefined) {
+        this.textX = this.canvasOffsetX - this.canvasScrollLeft +
+          (selected.node.x + (selected.node.width ?? 0) / 2) * scale;
+        this.textY = this.canvasOffsetY - this.canvasScrollTop +
+          (selected.node.y + (selected.node.height ?? 0) / 2) * scale;
+      }
+    } else if (this.isTyping) {
       this.textX = this.canvasOffsetX - this.canvasScrollLeft + this.textCanvasX * scale;
       this.textY = this.canvasOffsetY - this.canvasScrollTop + this.textCanvasY * scale;
     }
@@ -302,68 +338,53 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    if (data.tool === 'line') {
-
-      this.ctx.save();
-
-      this.ctx.globalCompositeOperation = 'source-over';
-
-      this.ctx.strokeStyle = data.color;
-      this.ctx.lineWidth = 2;
-      this.ctx.lineCap = 'round';
-
-      this.ctx.beginPath();
-
-      this.ctx.moveTo(
-        data.startX,
-        data.startY
-      );
-
-      this.ctx.lineTo(
-        data.endX,
-        data.endY
-      );
-
-      this.ctx.stroke();
+    if (
+      data.tool === 'line' &&
+      [data.startX, data.startY, data.endX, data.endY].every(Number.isFinite) &&
+      typeof data.color === 'string'
+    ) {
+      this.canvasElements.update(elements => [...elements, {
+        id: crypto.randomUUID(),
+        type: 'line',
+        startX: data.startX,
+        startY: data.startY,
+        endX: data.endX,
+        endY: data.endY,
+        color: data.color
+      }]);
     }
-    if (data.tool === 'circle') {
-
-      const radiusX = data.endX - data.startX;
-      const radiusY = data.endY - data.startY;
-
-      const centerX =
-        data.startX + radiusX / 2;
-
-      const centerY =
-        data.startY + radiusY / 2;
-
-      this.ctx.beginPath();
-
-      this.ctx.ellipse(
-        centerX,
-        centerY,
-        Math.abs(radiusX / 2),
-        Math.abs(radiusY / 2),
-        0,
-        0,
-        Math.PI * 2
-      );
-
-      this.ctx.stroke();
+    if (
+      data.tool === 'circle' &&
+      [data.startX, data.startY, data.endX, data.endY].every(Number.isFinite) &&
+      typeof data.color === 'string'
+    ) {
+      this.canvasElements.update(elements => [...elements, {
+        id: crypto.randomUUID(),
+        type: 'circle',
+        startX: data.startX,
+        startY: data.startY,
+        endX: data.endX,
+        endY: data.endY,
+        color: data.color
+      }]);
     }
-    if (data.tool === 'text') {
-
-      this.ctx.font = '12px Arial';
-      this.ctx.fillStyle = data.color;
-
-      this.ctx.fillText(
-        data.text,
-        data.x,
-        data.y + 20
-      );
+    if (
+      data.tool === 'text' &&
+      Number.isFinite(data.x) &&
+      Number.isFinite(data.y) &&
+      typeof data.text === 'string' &&
+      typeof data.color === 'string'
+    ) {
+      this.canvasElements.update(elements => [...elements, {
+        id: crypto.randomUUID(),
+        type: 'text',
+        x: data.x,
+        y: data.y,
+        text: data.text,
+        color: data.color
+      }]);
     }
-    this.ctx.restore();
-
+    this.renderCanvas();
   }
 
   private drawRemote(data: any): void {
@@ -407,6 +428,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     this.ctx.restore();
 
     this.remoteStrokePoints.set(data.socketId, { x: data.x, y: data.y });
+    this.remoteStrokeElements.get(data.socketId)?.points?.push({ x: data.x, y: data.y });
   }
 
   private getMousePosition(event: MouseEvent): { x: number; y: number } {
@@ -427,12 +449,30 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     return this.canvaService.findElementAt(this.ctx, this.canvasElements(), x, y);
   }
   private renderCanvas(): void {
+    const canvas = this.canvas.nativeElement;
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (this.legacyCanvasImage) {
+      this.ctx.drawImage(
+        this.legacyCanvasImage,
+        this.legacyImagePlacement.x,
+        this.legacyImagePlacement.y,
+        this.legacyImagePlacement.width,
+        this.legacyImagePlacement.height
+      );
+    }
+    for (const diagram of this.aiDiagrams()) {
+      const layout = layoutAiDiagram(diagram);
+      for (const edge of layout.edges) {
+        this.drawAiEdge(edge, 0);
+      }
+    }
     this.canvaService.render(
       this.ctx,
       this.canvasElements(),
-      this.selectedElement()
+      this.selectedElement(),
+      false
     );
-    this.renderStoredAiDiagrams();
+    this.updateCanvasLayout();
   }
   private addText(event: MouseEvent): void {
 
@@ -453,6 +493,39 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    if (this.isEditingAiLabel) {
+      const selected = this.selectedAiNode;
+      if (!selected) {
+        this.cancelText();
+        return;
+      }
+      const label = this.currentText.trim();
+      const updatedDiagram = {
+        ...selected.diagram,
+        nodes: selected.diagram.nodes.map(node =>
+          node.id === selected.node.id ? { ...node, label } : node
+        )
+      };
+      this.aiDiagrams.update(diagrams => diagrams.map(diagram =>
+        diagram.diagramId === updatedDiagram.diagramId ? updatedDiagram : diagram
+      ));
+      this.syncAiCanvasElements();
+      this.selectedElement.set(
+        this.canvasElements().find(element =>
+          element.data?.nodeId === selected.node.id
+        ) ?? null
+      );
+      this.isTyping = false;
+      this.isEditingAiLabel = false;
+      this.currentText = '';
+      this.renderCanvas();
+      this.socketService.sendAiDiagram({
+        boardId: this.board()?._id,
+        diagram: updatedDiagram
+      });
+      return;
+    }
+
     const canvas = this.canvas.nativeElement;
 
     const canvasX = this.textCanvasX;
@@ -463,11 +536,6 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     this.ctx.font = '20px Arial';
     this.ctx.fillStyle = this.color;
 
-    this.ctx.fillText(
-      this.currentText,
-      canvasX,
-      canvasY
-    );
     this.canvasElements.update(elements => [
       ...elements,
       {
@@ -487,6 +555,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       text: this.currentText,
       color: this.color
     });
+    this.renderCanvas();
     this.currentText = '';
 
     this.isTyping = false;
@@ -497,6 +566,58 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     this.currentText = '';
 
     this.isTyping = false;
+    this.isEditingAiLabel = false;
+  }
+
+  editSelectedAiLabel(): void {
+    const selected = this.selectedAiNode;
+    if (!selected) {
+      return;
+    }
+    this.currentText = selected.node.label;
+    this.isTyping = true;
+    this.isEditingAiLabel = true;
+    this.updateCanvasLayout();
+  }
+
+  deleteSelectedAiNode(): void {
+    const selected = this.selectedAiNode;
+    if (!selected) {
+      return;
+    }
+    const { diagram } = selected;
+    const remainingNodes = diagram.nodes.filter(node => node.id !== selected.node.id);
+    if (remainingNodes.length) {
+      const updatedDiagram: AiDiagram = {
+        ...diagram,
+        nodes: remainingNodes,
+        edges: diagram.edges.filter(edge =>
+          edge.source !== selected.node.id && edge.target !== selected.node.id
+        )
+      };
+      this.aiDiagrams.update(diagrams => diagrams.map(item =>
+        item.diagramId === diagram.diagramId ? updatedDiagram : item
+      ));
+      this.socketService.sendAiDiagram({
+        boardId: this.board()?._id,
+        diagram: updatedDiagram
+      });
+    } else {
+      this.aiDiagrams.update(diagrams =>
+        diagrams.filter(item => item.diagramId !== diagram.diagramId)
+      );
+      this.socketService.sendAiDiagram({
+        boardId: this.board()?._id,
+        diagram: {
+          diagramId: diagram.diagramId,
+          deletedNodeId: selected.node.id,
+          deletedDiagram: true
+        }
+      });
+    }
+    this.selectedElement.set(null);
+    this.syncAiCanvasElements();
+    this.renderCanvas();
   }
 
   loadBoard(id: string): void {
@@ -512,8 +633,10 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
           ? res.board.aiDiagrams
               .map((diagram: unknown) => normalizeAiDiagram(diagram))
               .filter((diagram: AiDiagram | null): diagram is AiDiagram => diagram !== null)
+              .map((diagram: AiDiagram) => this.positionDiagram(diagram))
           : [];
         this.aiDiagrams.set(savedDiagrams);
+        this.syncAiCanvasElements();
 
         const data = res.board?.canvasData;
 
@@ -563,13 +686,21 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       }
       const canvas = this.canvas.nativeElement;
       this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+      this.legacyCanvasImage = image;
+      this.legacyImagePlacement = {
+        x: (canvas.width - imageWidth) / 2,
+        y: (canvas.height - imageHeight) / 2,
+        width: imageWidth,
+        height: imageHeight
+      };
       this.ctx.drawImage(
         image,
-        (canvas.width - imageWidth) / 2,
-        (canvas.height - imageHeight) / 2,
+        this.legacyImagePlacement.x,
+        this.legacyImagePlacement.y,
         imageWidth,
         imageHeight
       );
+      this.renderCanvas();
       this.updateCanvasLayout();
     };
     image.onerror = () => this.notifications.error('Could not load the saved board canvas');
@@ -635,6 +766,9 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
         if (element.type === 'line' || element.type === 'circle') {
           this.dragOffsetX = x - element.startX!;
           this.dragOffsetY = y - element.startY!;
+        } else if (element.type === 'ai') {
+          this.dragOffsetX = x - (element.x ?? 0);
+          this.dragOffsetY = y - (element.y ?? 0);
         } else if (element.type === 'text') {
 
           this.dragOffsetX = x - element.x!;
@@ -726,6 +860,12 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
         'destination-out';
       this.ctx.lineWidth = 20;
       this.ctx.lineCap = 'round';
+      this.activePenElement = {
+        id: crypto.randomUUID(),
+        type: 'eraser',
+        points: [{ x, y }]
+      };
+      this.canvasElements.update(elements => [...elements, this.activePenElement!]);
       this.socketService.drawStart({
         boardId: this.board()?._id,
         tool: 'eraser',
@@ -814,6 +954,31 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
         this.renderCanvas();
 
+        return;
+      }
+
+      if (element.type === 'ai') {
+        const nextX = x - this.dragOffsetX;
+        const nextY = y - this.dragOffsetY;
+        const data = element.data;
+        if (!data?.diagramId || !data.nodeId) {
+          return;
+        }
+        this.aiDiagrams.update(diagrams => diagrams.map(diagram =>
+          diagram.diagramId !== data.diagramId
+            ? diagram
+            : {
+              ...diagram,
+              nodes: diagram.nodes.map(node => node.id === data.nodeId
+                ? { ...node, x: nextX, y: nextY }
+                : node)
+            }
+        ));
+        this.syncAiCanvasElements();
+        this.selectedElement.set(
+          this.canvasElements().find(item => item.id === element.id) ?? null
+        );
+        this.renderCanvas();
         return;
       }
 
@@ -919,6 +1084,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       this.ctx.stroke();
       this.startX = x;
       this.startY = y;
+      this.activePenElement?.points?.push({ x, y });
       this.socketService.draw({
         boardId: this.board()?._id,
         tool: 'eraser',
@@ -1033,6 +1199,15 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
     if (this.activeTool === 'select') {
 
+      if (this.isDragging) {
+        const selected = this.selectedAiNode;
+        if (selected) {
+          this.socketService.sendAiDiagram({
+            boardId: this.board()?._id,
+            diagram: selected.diagram
+          });
+        }
+      }
       this.isDragging = false;
       this.isDrawing = false;
 
@@ -1126,9 +1301,12 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     this.ctx.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
     this.canvasElements.set([]);
     this.aiDiagrams.set([]);
+    this.legacyCanvasImage = null;
+    this.legacyImagePlacement = { x: 0, y: 0, width: 0, height: 0 };
     this.canvaService.clear();
     this.selectedElement.set(null);
     this.remoteStrokePoints.clear();
+    this.remoteStrokeElements.clear();
   }
 
   saveBoard(): void {
@@ -1142,10 +1320,12 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
     this.isSaving = true;
     this.saveStatus = 'Saving…';
-    const canvasData =
-      this.canvas.nativeElement.toDataURL(
-        'image/png'
-      );
+    const canvasData = this.createCanvasSnapshotWithoutAi();
+    if (!canvasData) {
+      this.isSaving = false;
+      this.saveStatus = 'Save failed';
+      return;
+    }
 
 
     const data = {
@@ -1172,8 +1352,31 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
           this.saveStatus = 'Save failed';
           this.notifications.error(err.error?.message || 'Could not save board');
         }
-
       });
+  }
+
+  private createCanvasSnapshotWithoutAi(): string | null {
+    const source = this.canvas.nativeElement;
+    const snapshot = document.createElement('canvas');
+    snapshot.width = source.width;
+    snapshot.height = source.height;
+    const context = snapshot.getContext('2d');
+    if (!context) {
+      this.notifications.error('Could not prepare the board for saving');
+      return null;
+    }
+    if (this.legacyCanvasImage) {
+      context.drawImage(
+        this.legacyCanvasImage,
+        this.legacyImagePlacement.x,
+        this.legacyImagePlacement.y,
+        this.legacyImagePlacement.width,
+        this.legacyImagePlacement.height
+      );
+    }
+    const nonAiElements = this.canvasElements().filter(element => element.type !== 'ai');
+    this.canvaService.render(context, nonAiElements, null, false);
+    return snapshot.toDataURL('image/png');
   }
 
   addParticipant() {
@@ -1248,12 +1451,23 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    if (!this.drawAiDiagram(diagram)) {
+    const diagramToApply = {
+      ...diagram,
+      diagramId: diagram.diagramId || crypto.randomUUID()
+    };
+    if (!this.drawAiDiagram(diagramToApply)) {
+      return;
+    }
+    const positionedDiagram = this.aiDiagrams().find(item =>
+      item.diagramId === diagramToApply.diagramId
+    );
+    if (!positionedDiagram) {
+      this.notifications.error('Could not add the AI diagram to the board');
       return;
     }
     this.socketService.sendAiDiagram({
       boardId: this.board()?._id,
-      diagram
+      diagram: positionedDiagram
     });
     this.pendingAiDiagram.set(null);
     this.notifications.success('AI diagram added to the board');
@@ -1264,37 +1478,87 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   }
 
   drawAiDiagram(value: unknown): boolean {
-    const diagram = normalizeAiDiagram(value);
-    if (!diagram) {
+    const normalized = normalizeAiDiagram(value);
+    if (!normalized) {
       this.notifications.error('The AI returned an invalid diagram. Please try again.');
       return false;
     }
+    const existingIndex = normalized.diagramId
+      ? this.aiDiagrams().findIndex(item => item.diagramId === normalized.diagramId)
+      : -1;
     let offsetY = 0;
-    for (const existing of this.aiDiagrams()) {
-      offsetY += this.getAiDiagramContentHeight(existing) + 48;
+    if (existingIndex < 0) {
+      for (const existing of this.aiDiagrams()) {
+        offsetY += this.getAiDiagramContentHeight(existing) + 48;
+      }
     }
-    if (!this.renderAiDiagram(diagram, offsetY)) {
+    const diagram = this.positionDiagram(normalized, offsetY);
+    const nextDiagrams = [...this.aiDiagrams()];
+    if (existingIndex >= 0) {
+      nextDiagrams[existingIndex] = diagram;
+    } else {
+      nextDiagrams.push(diagram);
+    }
+    const requiredWidth = Math.max(
+      this.canvas.nativeElement.width,
+      ...nextDiagrams.map(item => layoutAiDiagram(item).width)
+    );
+    const requiredHeight = Math.max(
+      this.canvas.nativeElement.height,
+      ...nextDiagrams.map(item => layoutAiDiagram(item).height)
+    );
+    if (!this.resizeCanvas(requiredWidth, requiredHeight)) {
       return false;
     }
-    this.aiDiagrams.update(diagrams => [...diagrams, diagram]);
+    this.aiDiagrams.set(nextDiagrams);
+    this.syncAiCanvasElements();
+    this.renderCanvas();
     return true;
   }
 
   private receiveAiDiagram(value: unknown): void {
+    if (
+      value &&
+      typeof value === 'object' &&
+      'diagramId' in value &&
+      typeof value.diagramId === 'string' &&
+      'deletedNodeId' in value &&
+      typeof value.deletedNodeId === 'string'
+    ) {
+      const update = value as { diagramId: string; deletedNodeId: string; deletedDiagram?: boolean };
+      if (update.deletedDiagram) {
+        this.aiDiagrams.update(diagrams =>
+          diagrams.filter(diagram => diagram.diagramId !== update.diagramId)
+        );
+      } else {
+        this.aiDiagrams.update(diagrams => diagrams.flatMap(diagram => {
+          if (diagram.diagramId !== update.diagramId) {
+            return [diagram];
+          }
+          const nodes = diagram.nodes.filter(node => node.id !== update.deletedNodeId);
+          return nodes.length
+            ? [{
+              ...diagram,
+              nodes,
+              edges: diagram.edges.filter(edge =>
+                edge.source !== update.deletedNodeId && edge.target !== update.deletedNodeId
+              )
+            }]
+            : [];
+        }));
+      }
+      this.syncAiCanvasElements();
+      this.renderCanvas();
+      return;
+    }
     if (this.drawAiDiagram(value)) {
       this.notifications.success('A collaborator added an AI diagram');
     }
   }
 
   private renderStoredAiDiagrams(): void {
-    if (!this.ctx) {
-      return;
-    }
-    let offsetY = 0;
-    for (const diagram of this.aiDiagrams()) {
-      this.renderAiDiagram(diagram, offsetY);
-      offsetY += this.getAiDiagramContentHeight(diagram) + 48;
-    }
+    this.syncAiCanvasElements();
+    this.renderCanvas();
   }
 
   private getAiDiagramContentHeight(diagram: AiDiagram): number {
@@ -1306,27 +1570,60 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     return bottom;
   }
 
-  private renderAiDiagram(diagram: AiDiagram, offsetY = 0): boolean {
-    const layout = layoutAiDiagram(diagram);
-    const contentHeight = this.getAiDiagramContentHeight(diagram);
-    if (!this.resizeCanvas(layout.width, contentHeight + offsetY + 48)) {
-      return false;
-    }
+  private positionDiagram(diagram: AiDiagram, offsetY = 0): AiDiagram {
+    const positionedDiagram: AiDiagram = {
+      ...diagram,
+      diagramId: diagram.diagramId || crypto.randomUUID()
+    };
+    const layout = layoutAiDiagram(positionedDiagram);
+    return {
+      ...positionedDiagram,
+      nodes: positionedDiagram.nodes.map(node => {
+        const position = layout.positions[node.id];
+        return {
+          ...node,
+          x: node.x ?? position.x,
+          y: node.y ?? position.y + offsetY,
+          width: node.width ?? position.width,
+          height: node.height ?? position.height
+        };
+      })
+    };
+  }
 
-    for (const edge of layout.edges) {
-      this.drawAiEdge(edge, offsetY);
-    }
-    for (const node of diagram.nodes) {
-      const position = layout.positions[node.id];
-      if (position) {
-        this.drawAiNode(
-          { ...position, y: position.y + offsetY },
-          node.label,
-          node.shape
-        );
+  private syncAiCanvasElements(): void {
+    const aiElements: CanvasElement[] = [];
+    for (const diagram of this.aiDiagrams()) {
+      if (!diagram.diagramId) {
+        continue;
+      }
+      for (const node of diagram.nodes) {
+        if (
+          node.x === undefined ||
+          node.y === undefined ||
+          node.width === undefined ||
+          node.height === undefined
+        ) {
+          continue;
+        }
+        aiElements.push({
+          id: `ai:${diagram.diagramId}:${node.id}`,
+          type: 'ai',
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          text: node.label,
+          shape: node.shape,
+          color: '#7955d9',
+          data: { diagramId: diagram.diagramId, nodeId: node.id }
+        });
       }
     }
-    return true;
+    this.canvasElements.set([
+      ...this.canvasElements().filter(element => element.type !== 'ai'),
+      ...aiElements
+    ]);
   }
 
   private drawAiEdge(edgeLayout: AiDiagramLayout['edges'][number], offsetY: number): void {
@@ -1383,125 +1680,4 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private drawAiNode(position: AiNodePosition, label: string, shape: string): void {
-    const { x, y, width, height } = position;
-    this.ctx.save();
-    this.ctx.beginPath();
-    switch (shape) {
-      case 'circle':
-        this.ctx.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, 0, Math.PI * 2);
-        break;
-      case 'diamond':
-        this.ctx.moveTo(x + width / 2, y);
-        this.ctx.lineTo(x + width, y + height / 2);
-        this.ctx.lineTo(x + width / 2, y + height);
-        this.ctx.lineTo(x, y + height / 2);
-        this.ctx.closePath();
-        break;
-      case 'terminator':
-        this.ctx.roundRect(x, y, width, height, height / 2);
-        break;
-      case 'rectangle':
-      default:
-        this.ctx.roundRect(x, y, width, height, 6);
-        break;
-    }
-
-    this.ctx.fillStyle = '#f6f1ff';
-    this.ctx.strokeStyle = '#7955d9';
-    this.ctx.lineWidth = 2;
-    this.ctx.fill();
-    this.ctx.stroke();
-
-    this.ctx.fillStyle = '#3b3440';
-    this.ctx.font = '600 13px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    const maxTextWidth = width - 24;
-    const lines = this.wrapAiText(label, maxTextWidth, '600 13px Arial');
-    const maxLines = Math.max(1, Math.floor((height - 20) / 16));
-    if (lines.length > maxLines) {
-      lines.length = maxLines;
-      lines[maxLines - 1] = this.truncateText(lines[maxLines - 1], maxTextWidth);
-    }
-    const lineHeight = 16;
-    const startY = y + height / 2 - ((lines.length - 1) * lineHeight) / 2;
-    lines.forEach((line, index) =>
-      this.ctx.fillText(line, x + width / 2, startY + index * lineHeight)
-    );
-    this.ctx.restore();
-  }
-
-
-  private wrapAiText(text: string, maxWidth: number, font: string): string[] {
-    const words = (text || '').split(/\s+/).filter(Boolean);
-    if (!words.length) {
-      return [''];
-    }
-
-    const lines: string[] = [];
-    let currentLine = '';
-
-    this.ctx.save();
-    this.ctx.font = font;
-
-    for (const word of words) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word;
-      if (this.ctx.measureText(testLine).width <= maxWidth) {
-        currentLine = testLine;
-        continue;
-      }
-
-      if (currentLine) {
-        lines.push(currentLine);
-        currentLine = '';
-      }
-
-      if (this.ctx.measureText(word).width <= maxWidth) {
-        currentLine = word;
-        continue;
-      }
-
-      let segment = '';
-      for (const character of word) {
-        if (segment && this.ctx.measureText(segment + character).width > maxWidth) {
-          lines.push(segment);
-          segment = '';
-        }
-        segment += character;
-      }
-      currentLine = segment;
-    }
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    this.ctx.restore();
-
-    return lines.length ? lines : [''];
-  }
-
-  private truncateText(text: string, maxWidth: number): string {
-    const safeText = text || '';
-    if (!safeText) {
-      return '';
-    }
-
-    this.ctx.save();
-    this.ctx.font = '600 13px Arial';
-
-    if (this.ctx.measureText(safeText).width <= maxWidth) {
-      this.ctx.restore();
-      return safeText;
-    }
-
-    let truncated = safeText;
-    while (truncated.length > 0 && this.ctx.measureText(`${truncated}...`).width > maxWidth) {
-      truncated = truncated.slice(0, -1);
-    }
-
-    this.ctx.restore();
-    return `${truncated}...`;
-  }
 }

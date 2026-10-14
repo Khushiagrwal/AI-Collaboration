@@ -100,4 +100,27 @@ describe('AI diagram layout', () => {
     expect(layout.positions['yes'].x).toBeLessThan(layout.positions['no'].x);
     expect(layout.edges.every(edge => edge.edge.label)).toBe(true);
   });
+
+  it('preserves edited node positions and recalculates connected edge geometry', () => {
+    const diagram: AiDiagram = {
+      diagramId: 'diagram-1',
+      nodes: [
+        { id: 'source', type: 'flow', label: 'Source', shape: 'rectangle' },
+        { id: 'target', type: 'flow', label: 'Target', shape: 'rectangle' }
+      ],
+      edges: [{ source: 'source', target: 'target', label: 'Next' }]
+    };
+    const original = layoutAiDiagram(diagram);
+    const moved = normalizeAiDiagram({
+      ...diagram,
+      nodes: diagram.nodes.map(node =>
+        node.id === 'source' ? { ...node, x: 720, y: 360 } : node
+      )
+    });
+
+    expect(moved?.diagramId).toBe('diagram-1');
+    expect(moved?.nodes[0].x).toBe(720);
+    const updated = layoutAiDiagram(moved!);
+    expect(updated.edges[0].points[0]).not.toEqual(original.edges[0].points[0]);
+  });
 });

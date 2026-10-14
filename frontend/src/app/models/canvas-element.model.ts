@@ -17,7 +17,13 @@ export interface CanvasElement {
 
   x?: number;
   y?: number;
+  width?: number;
+  height?: number;
   text?: string;
+  shape?: 'circle' | 'rectangle' | 'diamond' | 'terminator';
 
-  data?: any;
+  data?: {
+    diagramId: string;
+    nodeId: string;
+  };
 }

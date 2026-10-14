@@ -12,6 +12,10 @@ export interface AiDiagramNode {
   type: string;
   label: string;
   shape: AiNodeShape;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface AiDiagramEdge {
@@ -21,6 +25,7 @@ export interface AiDiagramEdge {
 }
 
 export interface AiDiagram {
+  diagramId?: string;
   nodes: AiDiagramNode[];
   edges: AiDiagramEdge[];
 }
@@ -30,6 +35,7 @@ export interface AiNodePosition {
   y: number;
   width: number;
   height: number;
+  shape?: AiNodeShape;
 }
 
 export interface AiDiagramLayout {

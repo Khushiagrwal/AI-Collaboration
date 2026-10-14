@@ -223,6 +223,16 @@
       <button type="button" class="tool-button" [class.active]="activeTool === 'line'" title="Line" aria-label="Line tool" (click)="activeTool = 'line'"><span aria-hidden="true">／</span></button>
       <button type="button" class="tool-button text-tool" [class.active]="activeTool === 'text'" title="Text" aria-label="Text tool" (click)="activeTool = 'text'"><span aria-hidden="true">T</span></button>
       <span class="toolbar-divider" aria-hidden="true"></span>
+      @if (selectedAiNode) {
+      <button type="button" class="tool-button" title="Edit selected AI node label"
+        aria-label="Edit selected AI node label" (click)="editSelectedAiLabel()">
+        <span aria-hidden="true">✎</span>
+      </button>
+      <button type="button" class="tool-button clear-tool" title="Delete selected AI node"
+        aria-label="Delete selected AI node" (click)="deleteSelectedAiNode()">
+        <span aria-hidden="true">×</span>
+      </button>
+      }
       <button type="button" class="tool-button clear-tool" title="Clear canvas" aria-label="Clear canvas" (click)="clearCanvas()"><span aria-hidden="true">⌫</span></button>
 
     </aside>

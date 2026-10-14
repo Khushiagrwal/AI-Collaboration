@@ -21,7 +21,7 @@ export function normalizeAiDiagram(value: unknown): AiDiagram | null {
     return null;
   }
 
-  const candidate = value as { nodes?: unknown; edges?: unknown };
+  const candidate = value as { diagramId?: unknown; nodes?: unknown; edges?: unknown };
   if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) {
     return null;
   }
@@ -34,7 +34,16 @@ export function normalizeAiDiagram(value: unknown): AiDiagram | null {
       continue;
     }
 
-    const node = value as { id?: unknown; type?: unknown; label?: unknown; shape?: unknown };
+    const node = value as {
+      id?: unknown;
+      type?: unknown;
+      label?: unknown;
+      shape?: unknown;
+      x?: unknown;
+      y?: unknown;
+      width?: unknown;
+      height?: unknown;
+    };
     if (typeof node.id !== 'string' || typeof node.label !== 'string') {
       continue;
     }
@@ -47,13 +56,20 @@ export function normalizeAiDiagram(value: unknown): AiDiagram | null {
 
     const shape = isAiNodeShape(node.shape) ? node.shape : 'rectangle';
     seenIds.add(id);
+    const x = finiteCoordinate(node.x);
+    const y = finiteCoordinate(node.y);
+    const width = finitePositiveCoordinate(node.width);
+    const height = finitePositiveCoordinate(node.height);
     nodes.push({
       id,
       type: typeof node.type === 'string' && node.type.trim()
         ? node.type.trim()
         : shape,
       label,
-      shape
+      shape,
+      ...(x !== undefined && y !== undefined ? { x, y } : {}),
+      ...(width !== undefined ? { width } : {}),
+      ...(height !== undefined ? { height } : {})
     });
   }
 
@@ -87,7 +103,18 @@ export function normalizeAiDiagram(value: unknown): AiDiagram | null {
     });
   }
 
-  return { nodes, edges };
+  const diagramId = typeof candidate.diagramId === 'string' && candidate.diagramId.trim()
+    ? candidate.diagramId.trim()
+    : undefined;
+  return { ...(diagramId ? { diagramId } : {}), nodes, edges };
+}
+
+function finiteCoordinate(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function finitePositiveCoordinate(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 function isAiNodeShape(shape: unknown): shape is AiDiagramNode['shape'] {
@@ -116,24 +143,20 @@ function boundaryPoint(
   const centerX = position.x + position.width / 2;
   const centerY = position.y + position.height / 2;
 
-  if (position.width === position.height && dx === 0 && dy !== 0) {
-    return { x: centerX, y: centerY + Math.sign(dy) * position.height / 2 };
-  }
-
   if (dx === 0 && dy === 0) {
     return { x: centerX, y: position.y + position.height / 2 };
   }
 
-  if (position.width === 96 && position.height === 96) {
+  if (position.shape === 'circle') {
     const length = Math.hypot(dx, dy);
-    const radius = position.width / 2;
+    const radius = Math.min(position.width, position.height) / 2;
     return {
       x: centerX + dx / length * radius,
       y: centerY + dy / length * radius
     };
   }
 
-  if (position.height === 104) {
+  if (position.shape === 'diamond') {
     const scale = 1 / (
       Math.abs(dx) / (position.width / 2) +
       Math.abs(dy) / (position.height / 2)
@@ -170,13 +193,16 @@ export function layoutAiDiagram(
       const column = index % columns;
       const row = Math.floor(index / columns);
       positions[node.id] = {
-        ...size,
-        x: startX + column * GRID_CELL_WIDTH + (GRID_CELL_WIDTH - size.width) / 2,
-        y: startY + row * GRID_CELL_HEIGHT + (GRID_CELL_HEIGHT - size.height) / 2
+        ...resolveNodeSize(node, size),
+        shape: node.shape,
+        x: node.x ?? (startX + column * GRID_CELL_WIDTH + (GRID_CELL_WIDTH - size.width) / 2),
+        y: node.y ?? (startY + row * GRID_CELL_HEIGHT + (GRID_CELL_HEIGHT - size.height) / 2)
       };
     });
 
-    return { width, height, positions, edges: [] };
+    const nodeRight = Math.max(width, ...Object.values(positions).map(position => position.x + position.width + PADDING));
+    const nodeBottom = Math.max(height, ...Object.values(positions).map(position => position.y + position.height + PADDING));
+    return { width: nodeRight, height: nodeBottom, positions, edges: [] };
   }
 
   const nodeIds = diagram.nodes.map(node => node.id);
@@ -289,16 +315,26 @@ export function layoutAiDiagram(
     for (const node of layer) {
       const size = nodeSize(node.shape);
       positions[node.id] = {
-        ...size,
-        x,
-        y: y + (rowHeight - size.height) / 2
+        ...resolveNodeSize(node, size),
+        shape: node.shape,
+        x: node.x ?? x,
+        y: node.y ?? y + (rowHeight - size.height) / 2
       };
       x += size.width + HORIZONTAL_GAP;
     }
     y += rowHeight + VERTICAL_GAP;
   });
 
-  const height = Math.max(BASE_HEIGHT, availableHeight, y - VERTICAL_GAP + PADDING);
+  const height = Math.max(
+    BASE_HEIGHT,
+    availableHeight,
+    y - VERTICAL_GAP + PADDING,
+    ...Object.values(positions).map(position => position.y + position.height + PADDING)
+  );
+  const finalWidth = Math.max(
+    width,
+    ...Object.values(positions).map(position => position.x + position.width + PADDING)
+  );
   const edgeLayouts: AiDiagramLayout['edges'] = [];
   let routedEdgeIndex = 0;
   for (const edge of diagram.edges) {
@@ -310,7 +346,12 @@ export function layoutAiDiagram(
 
     const sourceLevel = levels.get(edge.source) ?? 0;
     const targetLevel = levels.get(edge.target) ?? 0;
-    if (targetLevel === sourceLevel + 1) {
+    const sourceCenterX = source.x + source.width / 2;
+    const sourceCenterY = source.y + source.height / 2;
+    const targetCenterX = target.x + target.width / 2;
+    const targetCenterY = target.y + target.height / 2;
+    const isBackEdge = targetLevel <= sourceLevel;
+    if (!isBackEdge && targetCenterY > sourceCenterY + 24) {
       const start = boundaryPoint(source, 0, 1);
       const end = boundaryPoint(target, 0, -1);
       const midY = (start.y + end.y) / 2;
@@ -328,7 +369,26 @@ export function layoutAiDiagram(
       continue;
     }
 
-    const laneX = width - PADDING - 18 * routedEdgeIndex++;
+    if (!isBackEdge) {
+      const direction = targetCenterX >= sourceCenterX ? 1 : -1;
+      const start = boundaryPoint(source, direction, 0);
+      const end = boundaryPoint(target, -direction, 0);
+      const midX = (start.x + end.x) / 2;
+      edgeLayouts.push({
+        edge,
+        points: [
+          start,
+          { x: midX, y: start.y },
+          { x: midX, y: end.y },
+          end
+        ],
+        labelX: midX,
+        labelY: (start.y + end.y) / 2
+      });
+      continue;
+    }
+
+    const laneX = finalWidth - PADDING - 18 * routedEdgeIndex++;
     const start = boundaryPoint(source, 1, 0);
     const end = boundaryPoint(target, 1, 0);
     const isSelfEdge = edge.source === edge.target;
@@ -349,5 +409,15 @@ export function layoutAiDiagram(
     });
   }
 
-  return { width, height, positions, edges: edgeLayouts };
+  return { width: finalWidth, height, positions, edges: edgeLayouts };
+}
+
+function resolveNodeSize(
+  node: AiDiagramNode,
+  fallback: { width: number; height: number }
+): { width: number; height: number } {
+  return {
+    width: node.width ?? fallback.width,
+    height: node.height ?? fallback.height
+  };
 }
