@@ -29,6 +29,13 @@ import { layoutAiDiagram, normalizeAiDiagram } from '../../services/canvas/ai-di
 const BASE_CANVAS_WIDTH = 1200;
 const BASE_CANVAS_HEIGHT = 800;
 const MAX_CANVAS_DIMENSION = 16384;
+const MAX_KNOWLEDGE_FILE_SIZE = 5 * 1024 * 1024;
+
+interface KnowledgeDocument {
+  id: string;
+  name: string;
+  size: number;
+}
 
 @Component({
   selector: 'app-board',
@@ -41,7 +48,7 @@ const MAX_CANVAS_DIMENSION = 16384;
     AiPanalModal
   ],
   templateUrl: './board.html',
-  styleUrl: './board.css',
+  styleUrls: ['./board.css', './knowledge-base.css'],
 })
 export class Board implements OnInit, AfterViewInit, OnDestroy {
 
@@ -102,6 +109,20 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   remoteCursors = signal<Record<string, any>>({});
   private lastCursorSent = 0;
   showAiModal = false;
+  knowledgeBaseCollapsed = false;
+  knowledgeUploadError = '';
+  knowledgeQuestion = '';
+  knowledgeQuestionError = '';
+  isKnowledgeDragOver = false;
+  knowledgeDocuments: KnowledgeDocument[] = [];
+  readonly knowledgeProcessingStages = [
+    'Uploading document',
+    'Extracting text',
+    'Creating text chunks',
+    'Generating embeddings',
+    'Storing in vector database',
+    'Ready to search'
+  ];
   pendingAiDiagram = signal<AiDiagram | null>(null);
   saveStatus = 'Ready to save';
   isSaving = false;
@@ -173,6 +194,79 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
   toggleColorPicker(): void {
     this.showColorPicker = !this.showColorPicker;
+  }
+
+  openKnowledgeFilePicker(input: HTMLInputElement): void {
+    input.click();
+  }
+
+  onKnowledgeFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.addKnowledgeFiles(input.files);
+    input.value = '';
+  }
+
+  onKnowledgeDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.isKnowledgeDragOver = true;
+  }
+
+  onKnowledgeDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.isKnowledgeDragOver = false;
+  }
+
+  onKnowledgeDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.isKnowledgeDragOver = false;
+    this.addKnowledgeFiles(event.dataTransfer?.files ?? null);
+  }
+
+  removeKnowledgeDocument(id: string): void {
+    this.knowledgeDocuments = this.knowledgeDocuments.filter(document => document.id !== id);
+  }
+
+  handleKnowledgeQuestionKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendKnowledgeQuestion();
+    }
+  }
+
+  sendKnowledgeQuestion(): void {
+    if (!this.knowledgeQuestion.trim()) {
+      return;
+    }
+    this.knowledgeQuestionError =
+      'Document search is not connected yet. Your question was not sent.';
+  }
+
+  private addKnowledgeFiles(files: FileList | null): void {
+    this.knowledgeUploadError = '';
+    if (!files?.length) {
+      return;
+    }
+
+    const accepted: KnowledgeDocument[] = [];
+    const errors: string[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.name.toLowerCase().endsWith('.txt')) {
+        errors.push(`${file.name}: only TXT files are available; PDF is coming soon.`);
+        continue;
+      }
+      if (file.size > MAX_KNOWLEDGE_FILE_SIZE) {
+        errors.push(`${file.name}: file exceeds the 5 MB limit.`);
+        continue;
+      }
+      accepted.push({
+        id: crypto.randomUUID(),
+        name: file.name,
+        size: file.size
+      });
+    }
+
+    this.knowledgeDocuments = [...this.knowledgeDocuments, ...accepted];
+    this.knowledgeUploadError = errors.join(' ');
   }
 
   @ViewChild('boardCanvas')

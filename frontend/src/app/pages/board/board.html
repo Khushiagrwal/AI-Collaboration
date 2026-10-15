@@ -278,6 +278,112 @@
 
 
     <aside class="right-panel" aria-label="AI Copilot">
+      <section class="knowledge-panel" aria-labelledby="knowledge-title">
+        <div class="knowledge-heading">
+          <div class="knowledge-title-wrap">
+            <span class="knowledge-icon" aria-hidden="true">◇</span>
+            <div>
+              <span class="copilot-overline">BOARD SOURCES</span>
+              <h2 id="knowledge-title">Knowledge Base</h2>
+            </div>
+          </div>
+          <button type="button" class="knowledge-collapse" (click)="knowledgeBaseCollapsed = !knowledgeBaseCollapsed"
+            [attr.aria-expanded]="!knowledgeBaseCollapsed" aria-controls="knowledge-content"
+            [attr.aria-label]="knowledgeBaseCollapsed ? 'Expand Knowledge Base' : 'Collapse Knowledge Base'">
+            <span aria-hidden="true">{{ knowledgeBaseCollapsed ? '+' : '−' }}</span>
+          </button>
+        </div>
+
+        @if (!knowledgeBaseCollapsed) {
+        <div id="knowledge-content" class="knowledge-content">
+          <p class="knowledge-intro">Keep useful notes close to your canvas and ask questions when search is connected.</p>
+
+          <div class="knowledge-dropzone" [class.drag-over]="isKnowledgeDragOver"
+            (dragover)="onKnowledgeDragOver($event)" (dragleave)="onKnowledgeDragLeave($event)"
+            (drop)="onKnowledgeDrop($event)">
+            <input #knowledgeFileInput class="visually-hidden" type="file" accept=".txt,text/plain" multiple
+              aria-label="Choose TXT documents" (change)="onKnowledgeFilesSelected($event)" />
+            <span class="upload-glyph" aria-hidden="true">↑</span>
+            <strong>Drop TXT files here</strong>
+            <span class="dropzone-caption">or choose a file · up to 5 MB</span>
+            <button class="knowledge-upload-button" type="button" (click)="openKnowledgeFilePicker(knowledgeFileInput)">
+              Choose TXT file
+            </button>
+            <div class="format-list">
+              <span class="format-pill active-format">TXT</span>
+              <span class="format-pill">PDF <small>Coming soon</small></span>
+            </div>
+          </div>
+          <p class="local-only-note"><span aria-hidden="true">ⓘ</span> Files are only selected in this browser; upload and processing are not connected.</p>
+
+          @if (knowledgeUploadError) {
+          <p class="knowledge-error" role="alert">{{ knowledgeUploadError }}</p>
+          }
+
+          @if (knowledgeDocuments.length) {
+          <div class="knowledge-documents" aria-label="Selected documents">
+            <div class="knowledge-document" *ngFor="let document of knowledgeDocuments">
+              <span class="document-type-icon" aria-hidden="true">TXT</span>
+              <span class="document-details">
+                <strong [attr.title]="document.name">{{ document.name }}</strong>
+                <small>{{ (document.size / 1024) | number:'1.0-0' }} KB · Ready to upload</small>
+              </span>
+              <button type="button" class="document-remove" (click)="removeKnowledgeDocument(document.id)"
+                [attr.aria-label]="'Remove ' + document.name" title="Remove file">×</button>
+            </div>
+          </div>
+          } @else {
+          <div class="knowledge-empty-docs">Your selected notes will appear here.</div>
+          }
+
+          <div class="processing-block">
+            <div class="processing-heading">
+              <strong>Processing status</strong>
+              <span>Not started</span>
+            </div>
+            <ol class="processing-stages">
+              @for (stage of knowledgeProcessingStages; track stage; let last = $last) {
+              <li [class.last-stage]="last">
+                <span class="stage-marker" aria-hidden="true">{{ last ? '◇' : '·' }}</span>
+                <span>{{ stage }}</span>
+              </li>
+              }
+            </ol>
+          </div>
+
+          <div class="knowledge-chat">
+            <div class="knowledge-chat-heading">
+              <strong>Ask your documents</strong>
+              <span aria-hidden="true">✧</span>
+            </div>
+            <div class="knowledge-conversation" aria-live="polite">
+              <span class="conversation-mark" aria-hidden="true">⌕</span>
+              <p>Answers and source references will appear here once document search is available.</p>
+            </div>
+            <label class="visually-hidden" for="knowledge-question">Ask a question about your documents</label>
+            <textarea id="knowledge-question" class="knowledge-question"
+              placeholder="Ask a question about your documents..." rows="3"
+              [(ngModel)]="knowledgeQuestion" (ngModelChange)="knowledgeQuestionError = ''"
+              (keydown)="handleKnowledgeQuestionKeydown($event)"></textarea>
+            <div class="question-footer">
+              <span>Enter to send · Shift+Enter for a new line</span>
+              <button type="button" class="question-send" (click)="sendKnowledgeQuestion()"
+                [disabled]="!knowledgeQuestion.trim()" aria-label="Send question">↑</button>
+            </div>
+            @if (knowledgeQuestionError) {
+            <p class="knowledge-error question-error" role="alert">{{ knowledgeQuestionError }}</p>
+            }
+            <button class="document-diagram-button" type="button" disabled
+              title="Available when document search is connected">
+              <span aria-hidden="true">✧</span> Generate diagram from documents
+            </button>
+          </div>
+        </div>
+        }
+
+        <div class="knowledge-divider" aria-hidden="true"></div>
+      </section>
+
       <div class="copilot-heading">
         <span class="copilot-icon" aria-hidden="true">✦</span>
         <div>
