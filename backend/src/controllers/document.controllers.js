@@ -1,6 +1,10 @@
 
 const path = require("path");
 const { randomUUID } = require("crypto");
+const Document = require("../models/Document");
+const { findAccessibleBoard } = require("../services/document-access.service");
+
+const BOARD_ID_PATTERN = /^[0-9a-f]{24}$/i;
 
 const {
   generateEmbedding
@@ -38,6 +42,23 @@ const createChunks = (text, chunkSize = 1000, overlap = 200) => {
 
 const uploadDocument = async (req, res) => {
   try {
+    const { boardId } = req.body ?? {};
+
+    if (typeof boardId !== "string" || !BOARD_ID_PATTERN.test(boardId)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid board ID is required"
+      });
+    }
+
+    const board = await findAccessibleBoard(boardId, req.user.id);
+    if (!board) {
+      return res.status(404).json({
+        success: false,
+        message: "Board not found or you don't have access"
+      });
+    }
+
     // 1. Check uploaded file
     if (!req.file) {
       return res.status(400).json({
@@ -103,6 +124,13 @@ const uploadDocument = async (req, res) => {
       documentId,
       req.file.originalname
     );
+
+    await Document.create({
+      documentId,
+      name: req.file.originalname,
+      board: board._id,
+      uploadedBy: req.user.id
+    });
 
     // 9. Return processing summary
     return res.status(200).json({

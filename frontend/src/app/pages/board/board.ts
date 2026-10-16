@@ -21,7 +21,10 @@ import { BoardService } from '../../services/boardService/boardService';
 import { SocketService } from '../../services/SocketService/socketService';
 import { InvitationService } from '../../services/invitation/invite';
 import { NotificationService } from '../../services/notification.service';
-import { AiPanalModal } from '../../components/ai-panel/ai-panal-modal/ai-panal-modal';
+import {
+  Ai,
+  DocumentAnswerResponse
+} from '../../services/aiService/ai';
 import { CanvasElement } from '../../models/canvas-element.model';
 import { AiDiagram, AiDiagramLayout } from '../../models/ai-diagram.model';
 import { layoutAiDiagram, normalizeAiDiagram } from '../../services/canvas/ai-diagram-layout';
@@ -35,6 +38,8 @@ interface KnowledgeDocument {
   id: string;
   name: string;
   size: number;
+  status: 'processing' | 'ready' | 'error';
+  documentId?: string;
 }
 
 @Component({
@@ -44,11 +49,10 @@ interface KnowledgeDocument {
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    RouterLink,
-    AiPanalModal
+    RouterLink
   ],
   templateUrl: './board.html',
-  styleUrls: ['./board.css', './knowledge-base.css'],
+  styleUrls: ['./board.css', './ai-workspace.css'],
 })
 export class Board implements OnInit, AfterViewInit, OnDestroy {
 
@@ -58,6 +62,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   private invitationService = inject(InvitationService);
   private notifications = inject(NotificationService);
   private canvaService = inject(Canva);
+  private aiService = inject(Ai);
 
   board = signal<any>(null);
   currentUser = signal<any>(null);
@@ -108,22 +113,16 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   private currentY = 0;
   remoteCursors = signal<Record<string, any>>({});
   private lastCursorSent = 0;
-  showAiModal = false;
-  knowledgeBaseCollapsed = false;
   knowledgeUploadError = '';
-  knowledgeQuestion = '';
-  knowledgeQuestionError = '';
+  aiPrompt = '';
+  aiError = '';
+  aiLoading = false;
+  aiResponseType: 'diagram' | 'document' | null = null;
+  documentResponse: DocumentAnswerResponse | null = null;
   isKnowledgeDragOver = false;
-  knowledgeDocuments: KnowledgeDocument[] = [];
-  readonly knowledgeProcessingStages = [
-    'Uploading document',
-    'Extracting text',
-    'Creating text chunks',
-    'Generating embeddings',
-    'Storing in vector database',
-    'Ready to search'
-  ];
+  knowledgeDocument: KnowledgeDocument | null = null;
   pendingAiDiagram = signal<AiDiagram | null>(null);
+  private aiRequestId = 0;
   saveStatus = 'Ready to save';
   isSaving = false;
   boardLoadError = false;
@@ -202,7 +201,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
   onKnowledgeFilesSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.addKnowledgeFiles(input.files);
+    this.addKnowledgeFile(input.files?.[0] ?? null);
     input.value = '';
   }
 
@@ -219,54 +218,146 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   onKnowledgeDrop(event: DragEvent): void {
     event.preventDefault();
     this.isKnowledgeDragOver = false;
-    this.addKnowledgeFiles(event.dataTransfer?.files ?? null);
+    this.addKnowledgeFile(event.dataTransfer?.files?.[0] ?? null);
   }
 
-  removeKnowledgeDocument(id: string): void {
-    this.knowledgeDocuments = this.knowledgeDocuments.filter(document => document.id !== id);
+  removeKnowledgeDocument(): void {
+    this.aiRequestId++;
+    this.aiLoading = false;
+    this.knowledgeDocument = null;
+    this.knowledgeUploadError = '';
+    this.aiError = '';
+    if (this.aiResponseType === 'document') {
+      this.documentResponse = null;
+      this.aiResponseType = null;
+    }
   }
 
-  handleKnowledgeQuestionKeydown(event: KeyboardEvent): void {
+  handleAiPromptKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      this.sendKnowledgeQuestion();
+      this.submitAiPrompt();
     }
   }
 
-  sendKnowledgeQuestion(): void {
-    if (!this.knowledgeQuestion.trim()) {
-      return;
-    }
-    this.knowledgeQuestionError =
-      'Document search is not connected yet. Your question was not sent.';
-  }
-
-  private addKnowledgeFiles(files: FileList | null): void {
-    this.knowledgeUploadError = '';
-    if (!files?.length) {
+  submitAiPrompt(): void {
+    const prompt = this.aiPrompt.trim();
+    if (!prompt || this.aiLoading) {
       return;
     }
 
-    const accepted: KnowledgeDocument[] = [];
-    const errors: string[] = [];
-    for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith('.txt')) {
-        errors.push(`${file.name}: only TXT files are available; PDF is coming soon.`);
-        continue;
+    this.aiError = '';
+    this.documentResponse = null;
+    this.pendingAiDiagram.set(null);
+    const requestId = ++this.aiRequestId;
+
+    if (this.knowledgeDocument) {
+      if (this.knowledgeDocument.status !== 'ready' || !this.knowledgeDocument.documentId) {
+        return;
       }
-      if (file.size > MAX_KNOWLEDGE_FILE_SIZE) {
-        errors.push(`${file.name}: file exceeds the 5 MB limit.`);
-        continue;
-      }
-      accepted.push({
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: file.size
+
+      this.aiLoading = true;
+      this.aiResponseType = 'document';
+      this.aiService.answerDocumentQuestion(prompt, this.knowledgeDocument.documentId).subscribe({
+        next: response => {
+          if (requestId !== this.aiRequestId) {
+            return;
+          }
+          this.documentResponse = response;
+          console.log("THIS IS answerDocumentQuestion RESPONSE ",this.documentResponse)
+          this.aiLoading = false;
+        },
+        error: error => {
+          if (requestId !== this.aiRequestId) {
+            return;
+          }
+          this.aiLoading = false;
+          this.aiError = error.error?.message || 'Could not search this document. Please try again.';
+        }
       });
+      return;
     }
 
-    this.knowledgeDocuments = [...this.knowledgeDocuments, ...accepted];
-    this.knowledgeUploadError = errors.join(' ');
+    this.aiLoading = true;
+    this.aiResponseType = 'diagram';
+    this.aiService.generateDiagram(prompt).subscribe({
+      next: response => {
+        if (requestId !== this.aiRequestId) {
+          return;
+        }
+        this.aiLoading = false;
+        this.onDiagramGenerated(response.result);
+      },
+      error: error => {
+        if (requestId !== this.aiRequestId) {
+          return;
+        }
+        this.aiLoading = false;
+        this.aiError = error.error?.message || 'Failed to generate a diagram. Please try again.';
+      }
+    });
+  }
+
+  private addKnowledgeFile(file: File | null): void {
+    this.knowledgeUploadError = '';
+    if (!file) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+      this.knowledgeUploadError = 'Only TXT files are supported.';
+      return;
+    }
+    if (file.size > MAX_KNOWLEDGE_FILE_SIZE) {
+      this.knowledgeUploadError = 'This file exceeds the 5 MB limit.';
+      return;
+    }
+
+    const selectedDocument: KnowledgeDocument = {
+      id: crypto.randomUUID(),
+      name: file.name,
+      size: file.size,
+      status: 'processing'
+    };
+    this.knowledgeDocument = selectedDocument;
+    this.aiError = '';
+    this.aiRequestId++;
+    this.aiLoading = false;
+    this.documentResponse = null;
+    this.pendingAiDiagram.set(null);
+    this.aiResponseType = null;
+
+    const boardId = this.board()?._id;
+    if (typeof boardId !== 'string' || !boardId) {
+      this.knowledgeUploadError = 'The board is not ready. Please try again.';
+      this.knowledgeDocument = null;
+      return;
+    }
+
+    this.aiService.uploadDocument(file, boardId).subscribe({
+      next: response => {
+        if (this.knowledgeDocument?.id !== selectedDocument.id) {
+          return;
+        }
+        if (!response.success || !response.document?.documentId) {
+          this.knowledgeDocument = { ...selectedDocument, status: 'error' };
+          this.knowledgeUploadError = response.message || 'Document processing failed.';
+          return;
+        }
+        this.knowledgeDocument = {
+          ...selectedDocument,
+          status: 'ready',
+          documentId: response.document.documentId
+        };
+      },
+      error: error => {
+        if (this.knowledgeDocument?.id !== selectedDocument.id) {
+          return;
+        }
+        this.knowledgeDocument = { ...selectedDocument, status: 'error' };
+        this.knowledgeUploadError = error.error?.message || 'Could not upload this document.';
+      }
+    });
   }
 
   @ViewChild('boardCanvas')
@@ -1532,11 +1623,11 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     const diagram = normalizeAiDiagram(value);
     if (!diagram) {
       this.notifications.error('The AI returned an invalid diagram. Please try again.');
-      this.showAiModal = false;
+      this.aiResponseType = null;
       return;
     }
     this.pendingAiDiagram.set(diagram);
-    this.showAiModal = false;
+    this.aiResponseType = 'diagram';
   }
 
   applyAiDiagram(): void {

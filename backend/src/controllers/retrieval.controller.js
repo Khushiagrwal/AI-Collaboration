@@ -7,6 +7,7 @@ const {
 const {
   initializeVectorStore
 } = require("../services/vector-store.service");
+const { findAccessibleDocument } = require("../services/document-access.service");
 
 const retrieveDocuments = async (req, res) => {
   try {
@@ -31,6 +32,22 @@ const retrieveDocuments = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Document ID is required"
+      });
+    }
+
+    try {
+      const document = await findAccessibleDocument(documentId.trim(), req.user.id);
+      if (!document) {
+        return res.status(404).json({
+          success: false,
+          message: "Document not found or you don't have access"
+        });
+      }
+    } catch (error) {
+      console.error("[Retrieval] Document access lookup failed:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Could not verify document access"
       });
     }
 

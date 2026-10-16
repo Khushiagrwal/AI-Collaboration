@@ -277,160 +277,114 @@
     </section>
 
 
-    <aside class="right-panel" aria-label="AI Copilot">
-      <section class="knowledge-panel" aria-labelledby="knowledge-title">
-        <div class="knowledge-heading">
-          <div class="knowledge-title-wrap">
-            <span class="knowledge-icon" aria-hidden="true">◇</span>
-            <div>
-              <span class="copilot-overline">BOARD SOURCES</span>
-              <h2 id="knowledge-title">Knowledge Base</h2>
-            </div>
-          </div>
-          <button type="button" class="knowledge-collapse" (click)="knowledgeBaseCollapsed = !knowledgeBaseCollapsed"
-            [attr.aria-expanded]="!knowledgeBaseCollapsed" aria-controls="knowledge-content"
-            [attr.aria-label]="knowledgeBaseCollapsed ? 'Expand Knowledge Base' : 'Collapse Knowledge Base'">
-            <span aria-hidden="true">{{ knowledgeBaseCollapsed ? '+' : '−' }}</span>
-          </button>
-        </div>
-
-        @if (!knowledgeBaseCollapsed) {
-        <div id="knowledge-content" class="knowledge-content">
-          <p class="knowledge-intro">Keep useful notes close to your canvas and ask questions when search is connected.</p>
-
-          <div class="knowledge-dropzone" [class.drag-over]="isKnowledgeDragOver"
-            (dragover)="onKnowledgeDragOver($event)" (dragleave)="onKnowledgeDragLeave($event)"
-            (drop)="onKnowledgeDrop($event)">
-            <input #knowledgeFileInput class="visually-hidden" type="file" accept=".txt,text/plain" multiple
-              aria-label="Choose TXT documents" (change)="onKnowledgeFilesSelected($event)" />
-            <span class="upload-glyph" aria-hidden="true">↑</span>
-            <strong>Drop TXT files here</strong>
-            <span class="dropzone-caption">or choose a file · up to 5 MB</span>
-            <button class="knowledge-upload-button" type="button" (click)="openKnowledgeFilePicker(knowledgeFileInput)">
-              Choose TXT file
-            </button>
-            <div class="format-list">
-              <span class="format-pill active-format">TXT</span>
-              <span class="format-pill">PDF <small>Coming soon</small></span>
-            </div>
-          </div>
-          <p class="local-only-note"><span aria-hidden="true">ⓘ</span> Files are only selected in this browser; upload and processing are not connected.</p>
-
-          @if (knowledgeUploadError) {
-          <p class="knowledge-error" role="alert">{{ knowledgeUploadError }}</p>
-          }
-
-          @if (knowledgeDocuments.length) {
-          <div class="knowledge-documents" aria-label="Selected documents">
-            <div class="knowledge-document" *ngFor="let document of knowledgeDocuments">
-              <span class="document-type-icon" aria-hidden="true">TXT</span>
-              <span class="document-details">
-                <strong [attr.title]="document.name">{{ document.name }}</strong>
-                <small>{{ (document.size / 1024) | number:'1.0-0' }} KB · Ready to upload</small>
-              </span>
-              <button type="button" class="document-remove" (click)="removeKnowledgeDocument(document.id)"
-                [attr.aria-label]="'Remove ' + document.name" title="Remove file">×</button>
-            </div>
-          </div>
-          } @else {
-          <div class="knowledge-empty-docs">Your selected notes will appear here.</div>
-          }
-
-          <div class="processing-block">
-            <div class="processing-heading">
-              <strong>Processing status</strong>
-              <span>Not started</span>
-            </div>
-            <ol class="processing-stages">
-              @for (stage of knowledgeProcessingStages; track stage; let last = $last) {
-              <li [class.last-stage]="last">
-                <span class="stage-marker" aria-hidden="true">{{ last ? '◇' : '·' }}</span>
-                <span>{{ stage }}</span>
-              </li>
-              }
-            </ol>
-          </div>
-
-          <div class="knowledge-chat">
-            <div class="knowledge-chat-heading">
-              <strong>Ask your documents</strong>
-              <span aria-hidden="true">✧</span>
-            </div>
-            <div class="knowledge-conversation" aria-live="polite">
-              <span class="conversation-mark" aria-hidden="true">⌕</span>
-              <p>Answers and source references will appear here once document search is available.</p>
-            </div>
-            <label class="visually-hidden" for="knowledge-question">Ask a question about your documents</label>
-            <textarea id="knowledge-question" class="knowledge-question"
-              placeholder="Ask a question about your documents..." rows="3"
-              [(ngModel)]="knowledgeQuestion" (ngModelChange)="knowledgeQuestionError = ''"
-              (keydown)="handleKnowledgeQuestionKeydown($event)"></textarea>
-            <div class="question-footer">
-              <span>Enter to send · Shift+Enter for a new line</span>
-              <button type="button" class="question-send" (click)="sendKnowledgeQuestion()"
-                [disabled]="!knowledgeQuestion.trim()" aria-label="Send question">↑</button>
-            </div>
-            @if (knowledgeQuestionError) {
-            <p class="knowledge-error question-error" role="alert">{{ knowledgeQuestionError }}</p>
-            }
-            <button class="document-diagram-button" type="button" disabled
-              title="Available when document search is connected">
-              <span aria-hidden="true">✧</span> Generate diagram from documents
-            </button>
-          </div>
-        </div>
-        }
-
-        <div class="knowledge-divider" aria-hidden="true"></div>
-      </section>
-
+    <aside class="right-panel" aria-label="AI workspace">
       <div class="copilot-heading">
         <span class="copilot-icon" aria-hidden="true">✦</span>
         <div>
           <span class="copilot-overline">YOUR CREATIVE PARTNER</span>
-          <h2>AI Copilot</h2>
+          <h2>AI workspace</h2>
         </div>
       </div>
-      <p class="copilot-intro">Turn a thought into a clear, editable diagram.</p>
-      <button class="copilot-generate" type="button" (click)="showAiModal = true"><span aria-hidden="true">✧</span> Generate a diagram</button>
+      <p class="copilot-intro">Ask a question or describe something to map. Attach a TXT document to search its contents.</p>
 
-      <div class="copilot-empty" *ngIf="!pendingAiDiagram()">
-        <span class="copilot-orbit" aria-hidden="true"><i></i><i></i><i></i></span>
-        <strong>Start with a thought</strong>
-        <p>Describe a process, product, or system and let AI sketch a first pass.</p>
-      </div>
+      <form class="ai-composer" [class.drag-over]="isKnowledgeDragOver"
+        (dragover)="onKnowledgeDragOver($event)" (dragleave)="onKnowledgeDragLeave($event)"
+        (drop)="onKnowledgeDrop($event)" (ngSubmit)="submitAiPrompt()">
+        <label class="ai-prompt-label" for="ai-workspace-prompt">
+          {{ knowledgeDocument ? 'Ask about your document' : 'What would you like to create?' }}
+        </label>
+        <textarea id="ai-workspace-prompt" class="ai-prompt"
+          [placeholder]="knowledgeDocument ? 'Ask a question about the attached document...' : 'Describe a process, product, system, or idea...'"
+          rows="4" [(ngModel)]="aiPrompt" name="aiPrompt"
+          (keydown)="handleAiPromptKeydown($event)" [disabled]="aiLoading"></textarea>
 
-      <section class="proposal-card" *ngIf="pendingAiDiagram() as diagram" aria-labelledby="proposal-title">
-        <div class="proposal-label"><span aria-hidden="true">✦</span> NEW PROPOSAL</div>
-        <h3 id="proposal-title">A starting point for your board</h3>
-        <p class="proposal-summary">{{ diagram.nodes.length }} nodes <span aria-hidden="true">·</span> {{ diagram.edges.length }} connections</p>
-        <div class="proposal-nodes">
-          <div class="proposal-node" *ngFor="let node of pendingDiagramNodes; let i = index">
-            <span class="proposal-node-dot" [class.dot-peach]="i % 3 === 1" [class.dot-sage]="i % 3 === 2"></span>
-            <span>{{ node.label }}</span>
+        <div class="ai-attachment-row">
+          <input #knowledgeFileInput class="visually-hidden" type="file" accept=".txt,text/plain"
+            aria-label="Attach a TXT document" (change)="onKnowledgeFilesSelected($event)" />
+          @if (knowledgeDocument) {
+          <div class="ai-document-chip" [class.upload-failed]="knowledgeDocument.status === 'error'">
+            <span class="document-type-icon" aria-hidden="true">TXT</span>
+            <span class="document-details">
+              <strong [attr.title]="knowledgeDocument.name">{{ knowledgeDocument.name }}</strong>
+              <small>
+                @if (knowledgeDocument.status === 'processing') { Processing document… }
+                @else if (knowledgeDocument.status === 'ready') { Ready to search · {{ (knowledgeDocument.size / 1024) | number:'1.0-0' }} KB }
+                @else { Processing failed · remove and retry }
+              </small>
+            </span>
+            <button type="button" class="document-remove" (click)="removeKnowledgeDocument()"
+              [attr.aria-label]="'Remove ' + knowledgeDocument.name" title="Remove attachment">×</button>
           </div>
-          <span class="proposal-more" *ngIf="diagram.nodes.length > pendingDiagramNodes.length">+{{ diagram.nodes.length - pendingDiagramNodes.length }} more nodes</span>
+          } @else {
+          <span class="attachment-hint">TXT · up to 5 MB</span>
+          }
+          <button class="knowledge-upload-button" type="button" (click)="openKnowledgeFilePicker(knowledgeFileInput)"
+            [disabled]="aiLoading">
+            <span aria-hidden="true">＋</span> {{ knowledgeDocument ? 'Replace' : 'Attach' }}
+          </button>
         </div>
-        <div class="evidence-note warning-note">
-          <span aria-hidden="true">!</span>
-          <p><strong>AI-generated · not verified</strong><br>No evidence or citations were returned. Review before applying.</p>
+        <div class="ai-composer-footer">
+          <span>Enter to send · Shift+Enter for a new line</span>
+          <button class="copilot-generate" type="submit"
+            [disabled]="!aiPrompt.trim() || aiLoading || (knowledgeDocument?.status !== 'ready' && !!knowledgeDocument)">
+            <span aria-hidden="true">{{ aiLoading ? '◌' : '✧' }}</span>
+            {{ aiLoading ? (knowledgeDocument ? 'Searching…' : 'Generating…') : 'Send' }}
+          </button>
         </div>
-        <div class="proposal-actions">
-          <button class="reject-button" type="button" (click)="rejectAiDiagram()">Reject</button>
-          <button class="apply-button" type="button" (click)="applyAiDiagram()">Apply to board</button>
-        </div>
-      </section>
+      </form>
 
-      <div class="copilot-footnote" *ngIf="!pendingAiDiagram()">
-        <span aria-hidden="true">◇</span>
-        <p>Every generated diagram is a draft. Review it before adding it to your shared canvas.</p>
-      </div>
-
-      @if (showAiModal) {
-      <app-ai-panal-modal (close)="showAiModal = false"
-        (diagramGenerated)="onDiagramGenerated($event)"></app-ai-panal-modal>
+      @if (knowledgeUploadError) {
+      <p class="knowledge-error" role="alert">{{ knowledgeUploadError }}</p>
       }
 
+      <section class="ai-response" aria-label="AI response" aria-live="polite">
+        <h3>Response</h3>
+        @if (aiLoading) {
+        <p class="response-status">{{ knowledgeDocument ? 'Searching the attached document…' : 'Creating a diagram…' }}</p>
+        } @else if (aiError) {
+        <p class="knowledge-error" role="alert">{{ aiError }}</p>
+        } @else if (aiResponseType === 'document' && documentResponse) {
+          <p class="document-answer">{{ documentResponse.answer }}</p>
+          @if (documentResponse.sources.length) {
+          <div class="answer-sources">
+            <strong>Sources</strong>
+            @for (source of documentResponse.sources; track (source.documentName || '') + (source.chunkIndex ?? '')) {
+            <span>
+              {{ source.documentName || 'Attached document' }}
+              @if (source.chunkIndex !== undefined) { · Passage {{ source.chunkIndex + 1 }} }
+            </span>
+            }
+          </div>
+          }
+        } @else if (aiResponseType === 'diagram' && pendingAiDiagram(); as diagram) {
+        <section class="proposal-card" aria-labelledby="proposal-title">
+          <div class="proposal-label"><span aria-hidden="true">✦</span> NEW PROPOSAL</div>
+          <h3 id="proposal-title">A starting point for your board</h3>
+          <p class="proposal-summary">{{ diagram.nodes.length }} nodes <span aria-hidden="true">·</span> {{ diagram.edges.length }} connections</p>
+          <div class="proposal-nodes">
+            <div class="proposal-node" *ngFor="let node of pendingDiagramNodes; let i = index">
+              <span class="proposal-node-dot" [class.dot-peach]="i % 3 === 1" [class.dot-sage]="i % 3 === 2"></span>
+              <span>{{ node.label }}</span>
+            </div>
+            <span class="proposal-more" *ngIf="diagram.nodes.length > pendingDiagramNodes.length">+{{ diagram.nodes.length - pendingDiagramNodes.length }} more nodes</span>
+          </div>
+          <div class="evidence-note warning-note">
+            <span aria-hidden="true">!</span>
+            <p><strong>AI-generated · not verified</strong><br>No evidence or citations were returned. Review before applying.</p>
+          </div>
+          <div class="proposal-actions">
+            <button class="reject-button" type="button" (click)="rejectAiDiagram()">Reject</button>
+            <button class="apply-button" type="button" (click)="applyAiDiagram()">Apply to board</button>
+          </div>
+        </section>
+        } @else {
+        <div class="copilot-empty">
+          <span class="copilot-orbit" aria-hidden="true"><i></i><i></i><i></i></span>
+          <strong>Start with a thought</strong>
+          <p>Your document passages or diagram draft will appear here.</p>
+        </div>
+        }
+      </section>
     </aside>
 
   </div>

@@ -5,6 +5,8 @@ const multer = require("multer");
 const {
   uploadDocument
 } = require("../controllers/document.controllers");
+const { answerDocumentQuestion } = require("../controllers/document-answer.controller");
+const authMiddleware = require("../middleware/auth");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -15,8 +17,9 @@ const upload = multer({
 const {
   retrieveDocuments
 } = require("../controllers/retrieval.controller")
-router.post("/retrieve", retrieveDocuments);
+router.post("/retrieve", authMiddleware, retrieveDocuments);
 
-router.post("/upload", upload.single("document"), uploadDocument);
+router.post("/answer", authMiddleware, answerDocumentQuestion);
+router.post("/upload", authMiddleware, upload.single("document"), uploadDocument);
 
 module.exports = router;
