@@ -196,7 +196,7 @@
     <aside class="toolbar" aria-label="Drawing tools">
       <span class="toolbar-label">TOOLS</span>
       <button type="button" class="tool-button" [class.active]="activeTool === 'select'" title="Select and move" aria-label="Select and move" (click)="activeTool = 'select'"><span aria-hidden="true">↖</span></button>
-      <button type="button" class="tool-button" [class.active]="activeTool === 'hand'" title="Pan canvas" aria-label="Pan canvas" (click)="activeTool = 'hand'"><span aria-hidden="true">✋</span></button>
+      <!-- <button type="button" class="tool-button" [class.active]="activeTool === 'hand'" title="Pan canvas" aria-label="Pan canvas" (click)="activeTool = 'hand'"><span aria-hidden="true">✋</span></button> -->
       <button type="button" class="tool-button pen-tool" [class.active]="activeTool === 'pen'" title="Pencil color: click to change"
         aria-label="Pencil tool. Click again to change color" (click)="activeTool = 'pen'; toggleColorPicker()">
         <span aria-hidden="true">✎</span>

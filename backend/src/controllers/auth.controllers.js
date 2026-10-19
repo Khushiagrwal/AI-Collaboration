@@ -26,8 +26,7 @@ exports.registerUser = async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
         );
-
-    res.status(201).json({success:true,data:user,token:token})
+    res.status(201).json({success:true,token:token})
      
   } catch (error) {
     res.status(500).json({
@@ -56,7 +55,7 @@ exports.loginUser = async (req, res) => {
             { expiresIn: "7d" }
         );
 
-        res.status(200).json({success:true,data:user,token:token})
+        res.status(200).json({success:true,token:token})
     }
 
   } catch (error) {

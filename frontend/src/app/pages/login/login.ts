@@ -49,6 +49,10 @@ export class Login {
   });
 
   submit() {
+    if (this.loginForm.invalid) {
+      this.loginForm.markAllAsTouched();
+      return;
+    }
 
     this.auth.login(this.loginForm.value).subscribe({
 
