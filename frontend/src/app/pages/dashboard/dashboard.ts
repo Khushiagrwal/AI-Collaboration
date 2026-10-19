@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../services/authService/auth';
 import { CreateBoardModal } from '../../components/create-board-modal/create-board-modal';
@@ -20,7 +20,8 @@ export class Dashboard {
     private auth: Auth,
     private boardService:BoardService,
     private router: Router,
-    private notifications: NotificationService
+    private notifications: NotificationService,
+    private changeDetector: ChangeDetectorRef
   ) {}
 
   ngOnInit(){
@@ -65,9 +66,11 @@ export class Dashboard {
         this.boards=res.boards ?? [];
         this.currentUser = res.currentUser ?? null;
         this.isLoading = false;
+        this.changeDetector.markForCheck();
       },error:(err:any)=>{
         this.isLoading = false;
         this.loadError = true;
+        this.changeDetector.markForCheck();
         this.notifications.error(err.error?.message || err.message || 'Could not load boards');
       }
     })
@@ -85,10 +88,12 @@ export class Dashboard {
   deleteBoard(id:any){
     this.boardService.deleteBoard(id).subscribe({
       next:(res:any)=>{
-        this.loadBoards()
+        this.boards = this.boards.filter(board => board._id !== id);
+        this.changeDetector.markForCheck();
         this.notifications.success('Board deleted successfully');
       },
       error:(err:any)=>{
+        this.changeDetector.markForCheck();
         this.notifications.error(err.error?.message || err.message || 'Could not delete board');
       }
     })

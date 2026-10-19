@@ -1,5 +1,6 @@
 import {
   AfterViewInit,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   inject,
@@ -61,6 +62,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   private socketService = inject(SocketService);
   private invitationService = inject(InvitationService);
   private notifications = inject(NotificationService);
+  private changeDetector = inject(ChangeDetectorRef);
   private canvaService = inject(Canva);
   private aiService = inject(Ai);
 
@@ -1587,10 +1589,12 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
           this.inviteStatus = 'Invitation link generated';
           this.notifications.success('Invitation link generated');
           this.participantEmail = '';
+          this.changeDetector.markForCheck();
         },
         error: (err) => {
           this.inviteError = err.error?.message || 'Could not create invitation';
           this.notifications.error(this.inviteError);
+          this.changeDetector.markForCheck();
         }
 
       });
@@ -1606,9 +1610,11 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
       this.linkCopied = true;
       this.inviteStatus = 'Link copied to clipboard';
       this.notifications.success('Invitation link copied');
+      this.changeDetector.markForCheck();
     } catch {
       this.inviteError = 'Could not copy the link. Please copy it manually.';
       this.notifications.error(this.inviteError);
+      this.changeDetector.markForCheck();
     }
   }
 
