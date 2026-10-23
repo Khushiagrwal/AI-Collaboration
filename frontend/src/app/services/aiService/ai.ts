@@ -1,3 +1,4 @@
+
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { environment } from '../../../environment/environment';
@@ -53,28 +54,45 @@ export class Ai {
   private http = inject(HttpClient);
   private api = environment.BACKEND_URL;
 
-  generateDiagram(prompt: string) {
-    return this.http.post<{ result: unknown }>(`${this.api}/ai/generate-diagram`, { prompt });
+  generateDiagram(prompt: string, boardId: string) {
+    return this.http.post<{
+      success: boolean;
+      result: unknown;
+      message?: string;
+    }>(`${this.api}/ai/generate-diagram`, {
+      prompt,
+      boardId,
+    });
   }
 
   uploadDocument(file: File, boardId: string) {
     const formData = new FormData();
     formData.append('document', file);
     formData.append('boardId', boardId);
-    return this.http.post<DocumentUploadResponse>(`${this.api}/documents/upload`, formData);
+
+    return this.http.post<DocumentUploadResponse>(
+      `${this.api}/documents/upload`,
+      formData
+    );
   }
 
   retrieveDocuments(question: string, documentId: string) {
-    return this.http.post<DocumentRetrievalResponse>(`${this.api}/documents/retrieve`, {
-      question,
-      documentId
-    });
+    return this.http.post<DocumentRetrievalResponse>(
+      `${this.api}/documents/retrieve`,
+      {
+        question,
+        documentId,
+      }
+    );
   }
 
   answerDocumentQuestion(question: string, documentId: string) {
-    return this.http.post<DocumentAnswerResponse>(`${this.api}/documents/answer`, {
-      question,
-      documentId
-    });
+    return this.http.post<DocumentAnswerResponse>(
+      `${this.api}/documents/answer`,
+      {
+        question,
+        documentId,
+      }
+    );
   }
 }

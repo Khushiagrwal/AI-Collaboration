@@ -242,63 +242,94 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  submitAiPrompt(): void {
-    const prompt = this.aiPrompt.trim();
-    if (!prompt || this.aiLoading) {
+  
+submitAiPrompt(): void {
+  const prompt = this.aiPrompt.trim();
+
+  if (!prompt || this.aiLoading) {
+    return;
+  }
+
+  this.aiError = '';
+  this.documentResponse = null;
+  this.pendingAiDiagram.set(null);
+
+  const requestId = ++this.aiRequestId;
+
+  // Existing document Q&A flow — unchanged
+  if (this.knowledgeDocument) {
+    if (
+      this.knowledgeDocument.status !== 'ready' ||
+      !this.knowledgeDocument.documentId
+    ) {
       return;
     }
 
-    this.aiError = '';
-    this.documentResponse = null;
-    this.pendingAiDiagram.set(null);
-    const requestId = ++this.aiRequestId;
+    this.aiLoading = true;
+    this.aiResponseType = 'document';
 
-    if (this.knowledgeDocument) {
-      if (this.knowledgeDocument.status !== 'ready' || !this.knowledgeDocument.documentId) {
-        return;
-      }
-
-      this.aiLoading = true;
-      this.aiResponseType = 'document';
-      this.aiService.answerDocumentQuestion(prompt, this.knowledgeDocument.documentId).subscribe({
+    this.aiService
+      .answerDocumentQuestion(
+        prompt,
+        this.knowledgeDocument.documentId
+      )
+      .subscribe({
         next: response => {
           if (requestId !== this.aiRequestId) {
             return;
           }
+
           this.documentResponse = response;
-          console.log("THIS IS answerDocumentQuestion RESPONSE ",this.documentResponse)
           this.aiLoading = false;
         },
         error: error => {
           if (requestId !== this.aiRequestId) {
             return;
           }
+
           this.aiLoading = false;
-          this.aiError = error.error?.message || 'Could not search this document. Please try again.';
+          this.aiError =
+            error.error?.message ||
+            'Could not search this document. Please try again.';
         }
       });
-      return;
-    }
 
-    this.aiLoading = true;
-    this.aiResponseType = 'diagram';
-    this.aiService.generateDiagram(prompt).subscribe({
-      next: response => {
-        if (requestId !== this.aiRequestId) {
-          return;
-        }
-        this.aiLoading = false;
-        this.onDiagramGenerated(response.result);
-      },
-      error: error => {
-        if (requestId !== this.aiRequestId) {
-          return;
-        }
-        this.aiLoading = false;
-        this.aiError = error.error?.message || 'Failed to generate a diagram. Please try again.';
-      }
-    });
+    return;
   }
+
+  // STM-enabled diagram flow
+  const boardId = this.board()?._id;
+
+  if (!boardId) {
+    this.aiError = 'Board ID is missing. Please reopen the board.';
+    return;
+  }
+
+  this.aiLoading = true;
+  this.aiResponseType = 'diagram';
+
+  this.aiService.generateDiagram(prompt, boardId).subscribe({
+    next: response => {
+      if (requestId !== this.aiRequestId) {
+        return;
+      }
+
+      this.aiLoading = false;
+      this.onDiagramGenerated(response.result);
+    },
+    error: error => {
+      if (requestId !== this.aiRequestId) {
+        return;
+      }
+
+      this.aiLoading = false;
+      this.aiError =
+        error.error?.message ||
+        'Failed to generate a diagram. Please try again.';
+    }
+  });
+}
+
 
   private addKnowledgeFile(file: File | null): void {
     this.knowledgeUploadError = '';
