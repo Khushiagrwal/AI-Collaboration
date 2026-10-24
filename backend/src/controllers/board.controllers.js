@@ -1,5 +1,6 @@
 const Board = require("../models/Board");
 const User = require("../models/User")
+const { canEditBoard, getBoardRole } = require("../services/board-access.service");
 
 exports.getBoards = async (req, res) => {
     try {
@@ -15,7 +16,8 @@ exports.getBoards = async (req, res) => {
 
         const boardsWithAccess = boards.map(board => ({
             ...board.toObject(),
-            isOwner: board.owner._id.toString() === req.user.id.toString()
+            isOwner: board.owner._id.toString() === req.user.id.toString(),
+            role: getBoardRole(board, req.user.id)
         }));
 
         const currentUser = await User.findById(req.user.id)
@@ -62,7 +64,8 @@ exports.getBoard = async (req, res) => {
             success: true,
             board,
             currentUser,
-            isOwner: board.owner._id.toString() === req.user.id.toString()
+            isOwner: board.owner._id.toString() === req.user.id.toString(),
+            role: getBoardRole(board, req.user.id)
         });
 
     } catch (err) {
@@ -92,17 +95,31 @@ exports.updateBoard = async (req, res) => {
     try {
         const board = await Board.findOne({
             _id: req.params.id,
-            owner: req.user.id
+            $or: [
+                { owner: req.user.id },
+                { participants: req.user.id }
+            ]
         });
 
         if (!board) {
             return res.status(404).json({
-                message: "Board not exist"
+                message: "Board not found or you don't have access"
+            });
+        }
+
+        if (!canEditBoard(board, req.user.id)) {
+            return res.status(403).json({
+                message: "Viewer access cannot edit this board"
             });
         }
 
         // Update title only if provided
         if (req.body.title !== undefined) {
+            if (board.owner.toString() !== req.user.id.toString()) {
+                return res.status(403).json({
+                    message: "Only the board owner can change its title"
+                });
+            }
             board.title = req.body.title;
         }
 
@@ -178,6 +195,14 @@ exports.addParticipant = async (req, res) => {
             });
         }
 
+        const role = req.body?.role ?? "editor";
+        if (!["viewer", "editor"].includes(role)) {
+            return res.status(400).json({
+                success: false,
+                message: "Role must be viewer or editor"
+            });
+        }
+
         const alreadyParticipant = board.participants.some(
             id => id.toString() === user._id.toString()
         );
@@ -197,6 +222,10 @@ exports.addParticipant = async (req, res) => {
         }
 
         board.participants.push(user._id);
+        board.participantRoles.push({
+            user: user._id,
+            role
+        });
         await board.save();
 
         const populatedBoard = await Board.findById(board._id)

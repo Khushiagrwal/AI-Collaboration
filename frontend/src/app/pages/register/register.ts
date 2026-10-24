@@ -96,7 +96,7 @@ export class Register {
           }
         });
       } else {
-        this.router.navigate(['dashboard']);
+        this.router.navigate(['/dashboard']);
       }
 
       this.notifications.success('Account created successfully');

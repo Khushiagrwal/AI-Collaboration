@@ -18,6 +18,11 @@ const createInvitation = async (req, res) => {
         message: "Board ID and email are required",
       });
     }
+    if (role !== undefined && !["viewer", "editor"].includes(role)) {
+      return res.status(400).json({
+        message: "Role must be viewer or editor",
+      });
+    }
 
     // Find board
     const board = await Board.findById(boardId);
@@ -174,8 +179,22 @@ const acceptInvitation = async (req, res) => {
 
     if (!alreadyParticipant && !isOwner) {
       board.participants.push(userId);
-      await board.save();
     }
+
+    if (!isOwner) {
+      const participantRole = board.participantRoles.find(
+        entry => entry.user.toString() === userId.toString()
+      );
+      if (participantRole) {
+        participantRole.role = invitation.role;
+      } else {
+        board.participantRoles.push({
+          user: userId,
+          role: invitation.role
+        });
+      }
+    }
+    await board.save();
 
     if (invitation.status === "pending") {
       invitation.status = "accepted";

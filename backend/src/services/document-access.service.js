@@ -1,13 +1,5 @@
-const Board = require("../models/Board");
 const Document = require("../models/Document");
-
-const findAccessibleBoard = (boardId, userId) => Board.findOne({
-  _id: boardId,
-  $or: [
-    { owner: userId },
-    { participants: userId }
-  ]
-});
+const { findAccessibleBoard } = require("./board-access.service");
 
 const findAccessibleDocument = async (documentId, userId) => {
   const document = await Document.findOne({ documentId });

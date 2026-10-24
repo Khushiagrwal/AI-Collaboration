@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import { Socket,io } from "socket.io-client";
+import { Socket, io } from "socket.io-client";
 import { environment } from "../../../environment/environment";
 
 @Injectable({
@@ -14,7 +14,29 @@ export class SocketService {
     }
 
     joinBoard(boardId: string) {
-    this.socket.emit('join-board', boardId);
+    const previousBoardId = this.currentBoardId;
+    if (previousBoardId && previousBoardId !== boardId) {
+        this.leaveBoard(previousBoardId);
+    }
+    this.currentBoardId = boardId;
+    this.socket.emit('join-board', {
+        boardId,
+        token: localStorage.getItem('token')
+    });
+    }
+
+    private currentBoardId: string | null = null;
+
+    leaveBoard(boardId: string) {
+    this.socket.emit('leave-board', boardId);
+    if (this.currentBoardId === boardId) {
+        this.currentBoardId = null;
+    }
+    }
+
+    onBoardAccessError(callback: (message: string) => void) {
+    this.socket.on('board-access-error', callback);
+    return () => this.socket.off('board-access-error', callback);
     }
 
     drawStart(data: any) {

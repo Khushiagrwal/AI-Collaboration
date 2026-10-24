@@ -5,8 +5,9 @@ const {
   registerUser,
   loginUser
 } = require("../controllers/auth.controllers");
+const aiRateLimiter = require("../middleware/aiRateLimiter");
 
 router.post("/register", registerUser);
-router.post("/login", loginUser);
+router.post("/login",aiRateLimiter, loginUser);
 
 module.exports = router;

@@ -20,16 +20,18 @@
         <span class="collaborator-total">{{ collaborators.length }}</span>
       </div>
 
-      @if (isOwner()) {
+      @if (canEdit()) {
       <button class="save-button" type="button" (click)="saveBoard()" [disabled]="isSaving">
         <span aria-hidden="true">{{ isSaving ? '◌' : '↧' }}</span> {{ isSaving ? 'Saving' : 'Save' }}
       </button>
+      }
 
+      @if (isOwner()) {
       <button class="share-button" type="button" (click)="showShareModal = true"><span aria-hidden="true">↗</span> Share</button>
       }
 
       @if (!isOwner()) {
-      <span class="access-label"><span aria-hidden="true">↗</span> Shared with you</span>
+      <span class="access-label"><span aria-hidden="true">↗</span> {{ canEdit() ? 'Editor access' : 'Viewer access' }}</span>
       }
 
       @if (isOwner() && showShareModal) {
@@ -165,6 +167,10 @@
 
               </div>
 
+              <span class="owner-badge">
+                {{ roleForParticipant(user._id) === 'editor' ? 'Can edit' : 'Can view' }}
+              </span>
+
             </div>
 
             }
@@ -195,6 +201,7 @@
 
     <aside class="toolbar" aria-label="Drawing tools">
       <span class="toolbar-label">TOOLS</span>
+      @if (canEdit()) {
       <button type="button" class="tool-button" [class.active]="activeTool === 'select'" title="Select and move" aria-label="Select and move" (click)="activeTool = 'select'"><span aria-hidden="true">↖</span></button>
       <!-- <button type="button" class="tool-button" [class.active]="activeTool === 'hand'" title="Pan canvas" aria-label="Pan canvas" (click)="activeTool = 'hand'"><span aria-hidden="true">✋</span></button> -->
       <button type="button" class="tool-button pen-tool" [class.active]="activeTool === 'pen'" title="Pencil color: click to change"
@@ -234,7 +241,9 @@
       </button>
       }
       <button type="button" class="tool-button clear-tool" title="Clear canvas" aria-label="Clear canvas" (click)="clearCanvas()"><span aria-hidden="true">⌫</span></button>
-
+      } @else {
+      <span class="toolbar-label">READ ONLY</span>
+      }
     </aside>
 
 
@@ -242,7 +251,7 @@
       <canvas #boardCanvas aria-label="Collaborative whiteboard canvas" tabindex="0"
         [style.width.px]="canvasCssWidth" [style.height.px]="canvasCssHeight"
         [style.marginLeft.px]="canvasOffsetX" [style.marginTop.px]="canvasOffsetY"
-        [style.cursor]="activeTool === 'hand' ? (isDrawing ? 'grabbing' : 'grab') : 'crosshair'"
+        [style.cursor]="!canEdit() ? 'default' : activeTool === 'hand' ? (isDrawing ? 'grabbing' : 'grab') : 'crosshair'"
         (pointerdown)="startDrawing($event)" (pointermove)="draw($event); trackCursor($event)"
         (pointerup)="stopDrawing($event)" (pointercancel)="stopDrawing($event); stopTrackingCursor()"
         (pointerleave)="stopTrackingCursor()">
@@ -287,6 +296,7 @@
       </div>
       <p class="copilot-intro">Ask a question or describe something to map. Attach a TXT document to search its contents.</p>
 
+      @if (canEdit()) {
       <form class="ai-composer" [class.drag-over]="isKnowledgeDragOver"
         (dragover)="onKnowledgeDragOver($event)" (dragleave)="onKnowledgeDragLeave($event)"
         (drop)="onKnowledgeDrop($event)" (ngSubmit)="submitAiPrompt()">
@@ -332,6 +342,9 @@
           </button>
         </div>
       </form>
+      } @else {
+      <p class="copilot-intro">Viewer access is read-only. An editor can create diagrams or attach documents.</p>
+      }
 
       @if (knowledgeUploadError) {
       <p class="knowledge-error" role="alert">{{ knowledgeUploadError }}</p>
@@ -372,10 +385,12 @@
             <span aria-hidden="true">!</span>
             <p><strong>AI-generated · not verified</strong><br>No evidence or citations were returned. Review before applying.</p>
           </div>
+          @if (canEdit()) {
           <div class="proposal-actions">
             <button class="reject-button" type="button" (click)="rejectAiDiagram()">Reject</button>
             <button class="apply-button" type="button" (click)="applyAiDiagram()">Apply to board</button>
           </div>
+          }
         </section>
         } @else {
         <div class="copilot-empty">
@@ -391,7 +406,7 @@
 
 
   <footer class="footer">
-    <span class="save-indicator"><i [class.saving]="isSaving"></i> {{ isOwner() ? saveStatus : 'Shared board' }}</span>
+    <span class="save-indicator"><i [class.saving]="isSaving"></i> {{ canEdit() ? saveStatus : 'Read-only board' }}</span>
     <span>Board canvas</span>
     <span>100% <span aria-hidden="true">⌕</span></span>
   </footer>

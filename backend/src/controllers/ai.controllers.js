@@ -5,6 +5,7 @@ const {
   getRecentMessages,
   saveMessage
 } = require("../services/conversation.service");
+const { canEditBoard, findAccessibleBoard } = require("../services/board-access.service");
 
 exports.generateDiagramController = async (req, res) => {
   try {
@@ -36,6 +37,19 @@ exports.generateDiagramController = async (req, res) => {
     }
 
     const cleanPrompt = prompt.trim();
+    const board = await findAccessibleBoard(boardId, userId);
+    if (!board) {
+      return res.status(404).json({
+        success: false,
+        message: "Board not found or you don't have access"
+      });
+    }
+    if (!canEditBoard(board, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Viewer access cannot generate diagrams"
+      });
+    }
 
     // 3. Retrieve previous messages BEFORE saving the current prompt
     const history = await getRecentMessages(boardId, userId);

@@ -82,7 +82,7 @@ export class Login {
         } else {
 
           // Normal login
-          this.router.navigate(['dashboard']);
+          this.router.navigate(['/dashboard']);
 
         }
 

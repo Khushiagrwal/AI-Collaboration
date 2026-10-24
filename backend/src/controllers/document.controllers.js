@@ -3,6 +3,7 @@ const path = require("path");
 const { randomUUID } = require("crypto");
 const Document = require("../models/Document");
 const { findAccessibleBoard } = require("../services/document-access.service");
+const { canEditBoard } = require("../services/board-access.service");
 
 const BOARD_ID_PATTERN = /^[0-9a-f]{24}$/i;
 
@@ -56,6 +57,12 @@ const uploadDocument = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Board not found or you don't have access"
+      });
+    }
+    if (!canEditBoard(board, req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Viewer access cannot upload documents"
       });
     }
 

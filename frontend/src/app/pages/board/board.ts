@@ -69,6 +69,7 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
   board = signal<any>(null);
   currentUser = signal<any>(null);
   isOwner = signal(false);
+  canEdit = signal(false);
   canvasElements = signal<CanvasElement[]>([]);
   aiDiagrams = signal<AiDiagram[]>([]);
   activeTool:
@@ -173,6 +174,13 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  roleForParticipant(userId: string): 'viewer' | 'editor' {
+    const access = (this.board()?.participantRoles ?? []).find((entry: any) =>
+      String(entry.user?._id ?? entry.user) === String(userId)
+    );
+    return access?.role === 'viewer' ? 'viewer' : 'editor';
+  }
+
   get pendingDiagramNodes(): any[] {
     return (this.pendingAiDiagram()?.nodes ?? []).slice(0, 4);
   }
@@ -244,6 +252,9 @@ export class Board implements OnInit, AfterViewInit, OnDestroy {
 
   
 submitAiPrompt(): void {
+  if (!this.canEdit()) {
+    return;
+  }
   const prompt = this.aiPrompt.trim();
 
   if (!prompt || this.aiLoading) {
@@ -332,6 +343,9 @@ submitAiPrompt(): void {
 
 
   private addKnowledgeFile(file: File | null): void {
+    if (!this.canEdit()) {
+      return;
+    }
     this.knowledgeUploadError = '';
     if (!file) {
       return;
@@ -458,6 +472,10 @@ submitAiPrompt(): void {
       this.receiveAiDiagram(diagram);
     }));
 
+    this.socketUnsubscribers.push(this.socketService.onBoardAccessError(message => {
+      this.notifications.error(message);
+    }));
+
   }
 
   ngAfterViewInit(): void {
@@ -501,6 +519,10 @@ submitAiPrompt(): void {
     window.removeEventListener('resize', this.onWindowResize);
     for (const unsubscribe of this.socketUnsubscribers.splice(0)) {
       unsubscribe();
+    }
+    const boardId = this.board()?._id ?? this.route.snapshot.paramMap.get('id');
+    if (boardId) {
+      this.socketService.leaveBoard(boardId);
     }
   }
 
@@ -703,6 +725,9 @@ submitAiPrompt(): void {
   }
 
   finishText(): void {
+    if (!this.canEdit()) {
+      return;
+    }
 
     if (!this.currentText.trim()) {
 
@@ -788,6 +813,9 @@ submitAiPrompt(): void {
   }
 
   editSelectedAiLabel(): void {
+    if (!this.canEdit()) {
+      return;
+    }
     const selected = this.selectedAiNode;
     if (!selected) {
       return;
@@ -799,6 +827,9 @@ submitAiPrompt(): void {
   }
 
   deleteSelectedAiNode(): void {
+    if (!this.canEdit()) {
+      return;
+    }
     const selected = this.selectedAiNode;
     if (!selected) {
       return;
@@ -847,6 +878,7 @@ submitAiPrompt(): void {
         this.board.set(res.board);
         this.currentUser.set(res.currentUser);
         this.isOwner.set(res.isOwner === true);
+        this.canEdit.set(res.role === 'owner' || res.role === 'editor');
         const savedDiagrams = Array.isArray(res.board?.aiDiagrams)
           ? res.board.aiDiagrams
               .map((diagram: unknown) => normalizeAiDiagram(diagram))
@@ -959,6 +991,9 @@ submitAiPrompt(): void {
   }
 
   startDrawing(event: PointerEvent): void {
+    if (!this.canEdit()) {
+      return;
+    }
     if (!event.isPrimary || this.activePointerId !== null) {
       return;
     }
@@ -1506,6 +1541,9 @@ submitAiPrompt(): void {
   }
 
   clearCanvas(): void {
+    if (!this.canEdit()) {
+      return;
+    }
     this.clearCanvasContent();
     this.socketService.clearBoard(
       this.board()?._id
@@ -1528,6 +1566,9 @@ submitAiPrompt(): void {
   }
 
   saveBoard(): void {
+    if (!this.canEdit()) {
+      return;
+    }
 
     if (!this.board()?._id) {
 
@@ -1598,6 +1639,9 @@ submitAiPrompt(): void {
   }
 
   addParticipant() {
+    if (!this.isOwner()) {
+      return;
+    }
     const email = this.participantEmail.trim().toLowerCase();
     if (!email) {
       return;
@@ -1657,6 +1701,9 @@ submitAiPrompt(): void {
   }
 
   onDiagramGenerated(value: unknown): void {
+    if (!this.canEdit()) {
+      return;
+    }
     const diagram = normalizeAiDiagram(value);
     if (!diagram) {
       this.notifications.error('The AI returned an invalid diagram. Please try again.');
@@ -1668,6 +1715,9 @@ submitAiPrompt(): void {
   }
 
   applyAiDiagram(): void {
+    if (!this.canEdit()) {
+      return;
+    }
     const diagram = this.pendingAiDiagram();
     if (!diagram) {
       return;
