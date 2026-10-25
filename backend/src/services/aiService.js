@@ -1,7 +1,7 @@
 
 const path = require("path");
 const dotenv = require("dotenv");
-
+let diagram;
 dotenv.config({
   path: path.resolve(__dirname, "..", "..", ".env")
 });
@@ -148,7 +148,21 @@ Rules:
     throw new Error("Gemini returned an empty diagram response");
   }
 
-  return JSON.parse(response.text);
+try {
+  diagram = JSON.parse(response.text);
+} catch {
+  throw new Error("Gemini returned invalid JSON");
+}
+
+const validation = validateAIResponse(diagram);
+
+if (!validation.valid) {
+  const error = new Error("Gemini returned an invalid diagram");
+  error.details = validation.errors;
+  throw error;
+}
+
+return validation.data;
 }
 
 /**
